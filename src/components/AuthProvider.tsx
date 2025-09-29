@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface AuthContextType {
     user: string | null;
-    login: (email: string) => void;
+    login: (email: string, token?: string) => void;
     logout: () => void;
     isLoading: boolean;
 }
@@ -32,9 +32,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsLoading(false);
     }, []);
 
-    const login = (email: string) => {
+    const login = (email: string, token?: string) => {
         setUser(email);
         localStorage.setItem('user', email);
+        if (token) {
+            localStorage.setItem('auth-token', token);
+        }
     };
 
     const logout = async () => {
@@ -45,6 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } finally {
             setUser(null);
             localStorage.removeItem('user');
+            localStorage.removeItem('auth-token');
         }
     };
 

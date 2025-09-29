@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { LogIn, UserPlus, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 
 interface LoginFormProps {
-    onLoginSuccess: (email: string) => void;
+    onLoginSuccess: (email: string, token?: string) => void;
 }
 
 const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
@@ -54,8 +54,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
             }
 
             if (isLogin) {
-                // 로그인 성공
-                onLoginSuccess(data.email);
+                // 로그인 성공 - 토큰과 함께 콜백 호출
+                onLoginSuccess(data.email, data.token);
+
+                // AuthProvider 상태 변경으로 자동으로 ExpenseTracker가 렌더링됨
+                // router.push('/') 제거 - 불필요한 페이지 새로고침 방지
             } else {
                 // 회원가입 성공
                 setIsLogin(true);
@@ -114,7 +117,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 placeholder="your@email.com"
-                                className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder:text-gray-500"
                                 disabled={loading}
                             />
                         </div>
@@ -132,7 +135,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 placeholder="••••••••"
-                                className="w-full pl-11 pr-11 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                className="w-full pl-11 pr-11 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder:text-gray-500"
                                 disabled={loading}
                             />
                             <button

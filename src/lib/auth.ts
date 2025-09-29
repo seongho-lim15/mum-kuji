@@ -1,5 +1,6 @@
 import { kv } from '@vercel/kv';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 export interface User {
     email: string;
@@ -74,5 +75,28 @@ export class AuthService {
             return { isValid: false, message: '비밀번호는 최소 6자 이상이어야 합니다' };
         }
         return { isValid: true };
+    }
+
+    static generateToken(user: User): string {
+        const secret = process.env.JWT_SECRET || 'your-super-secret-key-change-in-production';
+        const payload = {
+            email: user.email,
+            createdAt: user.createdAt
+        };
+
+        return jwt.sign(payload, secret, {
+            expiresIn: '7d',
+            algorithm: 'HS256'
+        });
+    }
+
+    static verifyToken(token: string): { email: string; createdAt: string } | null {
+        try {
+            const secret = process.env.JWT_SECRET || 'your-super-secret-key-change-in-production';
+            const decoded = jwt.verify(token, secret) as { email: string; createdAt: string };
+            return decoded;
+        } catch {
+            return null;
+        }
     }
 }

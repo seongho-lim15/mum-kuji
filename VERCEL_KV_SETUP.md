@@ -19,7 +19,7 @@
 3. `.env.local` 파일에 붙여넣기
 
 ```bash
-cp .env.local.example .env.local
+cp .env .env.local
 ```
 
 ### Vercel 프로덕션 환경:

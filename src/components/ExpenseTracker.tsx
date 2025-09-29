@@ -1,37 +1,74 @@
 "use client"
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Calendar, DollarSign, Tag, Search, Settings, BarChart3, List, Target, LogOut } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAuth } from './AuthProvider';
+import { Item, Transaction, UserSettings } from '@/lib/dataService';
 
 const ExpenseTracker = () => {
     const { user, logout } = useAuth();
-    const [transactions, setTransactions] = useState([]);
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [itemList, setItemList] = useState<Item[]>([]);
     const [showForm, setShowForm] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
-    const [currentView, setCurrentView] = useState('list'); // 'list', 'chart'
-    const [timeFilter, setTimeFilter] = useState('month'); // 'day', 'week', 'month', 'year'
-    const [budget, setBudget] = useState(100000); // 한도 금액
+    const [currentView, setCurrentView] = useState('list');
+    const [timeFilter, setTimeFilter] = useState('month');
+    const [budget, setBudget] = useState(100000);
     const [searchTerm, setSearchTerm] = useState('');
-
-    // 기본 품목 리스트
-    const [itemList, setItemList] = useState([
-        { name: '원피스', price: 13000, category: '만화' },
-        { name: '나루토', price: 12000, category: '만화' },
-        { name: '블리치', price: 11000, category: '만화' },
-        { name: '커피', price: 4500, category: '음료' },
-        { name: '점심', price: 8000, category: '식사' },
-        { name: '지하철', price: 1500, category: '교통' }
-    ]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState('');
 
     const [formData, setFormData] = useState({
         amount: '',
         description: '',
         category: '만화',
         date: new Date().toISOString().split('T')[0],
-        selectedItem: null
+        selectedItem: null as Item | null
     });
+
+    // 데이터 로드
+    useEffect(() => {
+        if (!user) return;
+
+        const loadData = async () => {
+            try {
+                setIsLoading(true);
+
+                // 병렬로 데이터 로드
+                const [itemsRes, transactionsRes, settingsRes] = await Promise.all([
+                    fetch('/api/data/items'),
+                    fetch('/api/data/transactions'),
+                    fetch('/api/data/settings')
+                ]);
+
+                if (itemsRes.ok) {
+                    const { items } = await itemsRes.json();
+                    setItemList(items);
+                }
+
+                if (transactionsRes.ok) {
+                    const { transactions } = await transactionsRes.json();
+                    setTransactions(transactions);
+                }
+
+                if (settingsRes.ok) {
+                    const { settings } = await settingsRes.json();
+                    setBudget(settings.budget);
+                    setTimeFilter(settings.timeFilter);
+                    setCurrentView(settings.currentView);
+                }
+
+            } catch (err) {
+                setError('데이터를 불러오는 중 오류가 발생했습니다');
+                console.error('데이터 로드 오류:', err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadData();
+    }, [user]);
 
     // 필터링된 품목 리스트
     const filteredItems = useMemo(() => {
@@ -52,42 +89,105 @@ const ExpenseTracker = () => {
         setSearchTerm('');
     };
 
-    // 새 품목 추가
-    const addNewItem = () => {
-        if (formData.description && formData.amount && !itemList.find(item => item.name === formData.description)) {
-            const newItem = {
-                name: formData.description,
-                price: parseInt(formData.amount),
-                category: formData.category
-            };
-            setItemList([...itemList, newItem]);
+    // 새 품목 추가 (API 호출)
+    const addNewItem = async (item: { name: string; price: number; category: string }) => {
+        try {
+            const response = await fetch('/api/data/items', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(item)
+            });
+
+            if (response.ok) {
+                const { items } = await response.json();
+                setItemList(items);
+                return true;
+            } else {
+                const { error } = await response.json();
+                setError(error);
+                return false;
+            }
+        } catch {
+            setError('품목 추가 중 오류가 발생했습니다');
+            return false;
         }
     };
 
-    const handleSubmit = () => {
+    // 거래 추가 (API 호출)
+    const addTransaction = async (transaction: Omit<Transaction, 'id' | 'timestamp'>) => {
+        try {
+            const response = await fetch('/api/data/transactions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(transaction)
+            });
+
+            if (response.ok) {
+                const { transactions } = await response.json();
+                setTransactions(transactions);
+                return true;
+            } else {
+                const { error } = await response.json();
+                setError(error);
+                return false;
+            }
+        } catch {
+            setError('거래 추가 중 오류가 발생했습니다');
+            return false;
+        }
+    };
+
+    // 설정 업데이트 (API 호출)
+    const updateSettings = async (settings: Partial<UserSettings>) => {
+        try {
+            const response = await fetch('/api/data/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings)
+            });
+
+            if (!response.ok) {
+                const { error } = await response.json();
+                setError(error);
+            }
+        } catch {
+            setError('설정 저장 중 오류가 발생했습니다');
+        }
+    };
+
+    const handleSubmit = async () => {
         if (!formData.amount || !formData.description) return;
 
-        addNewItem(); // 새 품목이면 추가
+        setError('');
 
-        const newTransaction = {
-            id: Date.now(),
+        // 새 품목 추가 (중복되지 않는 경우)
+        if (formData.description && formData.amount &&
+            !itemList.find(item => item.name === formData.description)) {
+            await addNewItem({
+                name: formData.description,
+                price: parseInt(formData.amount),
+                category: formData.category
+            });
+        }
+
+        // 거래 추가
+        const success = await addTransaction({
             amount: parseFloat(formData.amount),
             description: formData.description,
             category: formData.category,
-            date: formData.date,
-            timestamp: new Date(formData.date).getTime()
-        };
-
-        // @ts-expect-error - Adding new transaction to existing array
-        setTransactions([newTransaction, ...transactions]);
-        setFormData({
-            amount: '',
-            description: '',
-            category: '만화',
-            date: new Date().toISOString().split('T')[0],
-            selectedItem: null
+            date: formData.date
         });
-        setShowForm(false);
+
+        if (success) {
+            setFormData({
+                amount: '',
+                description: '',
+                category: '만화',
+                date: new Date().toISOString().split('T')[0],
+                selectedItem: null
+            });
+            setShowForm(false);
+        }
     };
 
     // 날짜별 데이터 그룹핑
@@ -164,12 +264,60 @@ const ExpenseTracker = () => {
         return Object.values(grouped).sort((a, b) => a.period.localeCompare(b.period));
     };
 
+    // 설정 변경 핸들러들
+    const handleViewChange = async (view: string) => {
+        setCurrentView(view);
+        await updateSettings({ currentView: view });
+    };
+
+    const handleTimeFilterChange = async (filter: string) => {
+        setTimeFilter(filter);
+        await updateSettings({ timeFilter: filter });
+    };
+
+    const handleBudgetChange = async (newBudget: number) => {
+        setBudget(newBudget);
+        await updateSettings({ budget: newBudget });
+    };
+
     const chartData = getGroupedData();
     const totalSpent = transactions.reduce((sum, t) => sum + t.amount, 0);
     const remainingBudget = budget - totalSpent;
 
+    // 로딩 상태
+    if (isLoading) {
+        return (
+            <div className="max-w-md mx-auto bg-white min-h-screen flex items-center justify-center">
+                <div className="text-center">
+                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-600">데이터를 불러오는 중...</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="max-w-md mx-auto bg-white min-h-screen">
+            {/* 에러 표시 */}
+            {error && (
+                <div className="bg-red-50 border-l-4 border-red-400 p-4 mx-4 mt-4 rounded">
+                    <div className="flex">
+                        <div className="flex-shrink-0">
+                            <span className="text-red-400">⚠️</span>
+                        </div>
+                        <div className="ml-3">
+                            <p className="text-sm text-red-700">{error}</p>
+                            <button
+                                onClick={() => setError('')}
+                                className="text-xs text-red-600 hover:text-red-800 mt-1"
+                            >
+                                닫기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* 헤더 */}
             <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4">
                 <div className="flex justify-between items-center">
@@ -224,7 +372,7 @@ const ExpenseTracker = () => {
             {/* 탭 메뉴 */}
             <div className="flex bg-gray-100">
                 <button
-                    onClick={() => setCurrentView('list')}
+                    onClick={() => handleViewChange('list')}
                     className={`flex-1 py-3 flex items-center justify-center space-x-2 ${
                         currentView === 'list' ? 'bg-white shadow-sm' : ''
                     }`}
@@ -233,7 +381,7 @@ const ExpenseTracker = () => {
                     <span>리스트</span>
                 </button>
                 <button
-                    onClick={() => setCurrentView('chart')}
+                    onClick={() => handleViewChange('chart')}
                     className={`flex-1 py-3 flex items-center justify-center space-x-2 ${
                         currentView === 'chart' ? 'bg-white shadow-sm' : ''
                     }`}
@@ -254,7 +402,7 @@ const ExpenseTracker = () => {
                     ].map(filter => (
                         <button
                             key={filter.key}
-                            onClick={() => setTimeFilter(filter.key)}
+                            onClick={() => handleTimeFilterChange(filter.key)}
                             className={`px-3 py-1 rounded-full text-sm ${
                                 timeFilter === filter.key
                                     ? 'bg-blue-500 text-white'
@@ -514,7 +662,7 @@ const ExpenseTracker = () => {
                                 <input
                                     type="number"
                                     value={budget}
-                                    onChange={(e) => setBudget(parseInt(e.target.value) || 0)}
+                                    onChange={(e) => handleBudgetChange(parseInt(e.target.value) || 0)}
                                     className="w-full pl-10 pr-4 py-3 border rounded-lg text-right text-xl focus:outline-none focus:border-blue-500"
                                 />
                             </div>

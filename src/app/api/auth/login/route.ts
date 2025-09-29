@@ -16,13 +16,25 @@ export async function POST(request: NextRequest) {
         // 사용자 인증 (KV에서 조회 및 비밀번호 검증)
         const user = await AuthService.authenticateUser(email, password);
 
+        // JWT 토큰 생성
+        const token = AuthService.generateToken(user);
+
         // 로그인 성공
         const response = NextResponse.json({
             message: '로그인 성공',
-            email: user.email
+            email: user.email,
+            token: token
         });
 
-        // 쿠키 기반 세션 설정
+        // JWT 토큰을 쿠키에 저장
+        response.cookies.set('auth-token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 60 * 60 * 24 * 7 // 7일
+        });
+
+        // 기존 auth 쿠키도 유지 (하위 호환성)
         response.cookies.set('auth', user.email, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',

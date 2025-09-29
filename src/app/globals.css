@@ -12,15 +12,28 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* 다크모드 자동 전환 비활성화 - 항상 라이트모드 사용 */
+/*
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
   }
 }
+*/
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* 기본 텍스트 색상을 명시적으로 설정 */
+* {
+  color: inherit;
+}
+
+/* 모든 텍스트 요소에 기본 색상 강제 적용 */
+p, h1, h2, h3, h4, h5, h6, span, div, button, input, textarea, label {
+  color: #171717;
 }

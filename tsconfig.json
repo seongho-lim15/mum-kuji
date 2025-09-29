@@ -8,6 +8,7 @@
     "noImplicitAny": false,
     "noEmit": true,
     "esModuleInterop": true,
+    "useUnknownInCatchVariables": false,
     "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,

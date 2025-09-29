@@ -78,7 +78,7 @@ const ExpenseTracker = () => {
     }, [itemList, searchTerm]);
 
     // 품목 선택 시 자동 금액 설정
-    const handleItemSelect = (item) => {
+    const handleItemSelect = (item: Item) => {
         setFormData({
             ...formData,
             selectedItem: item,
@@ -193,14 +193,14 @@ const ExpenseTracker = () => {
     // 날짜별 데이터 그룹핑
     const getGroupedData = () => {
         const now = new Date();
-        let filteredTransactions = [];
+        let filteredTransactions: Transaction[] = [];
 
         switch (timeFilter) {
             case 'day':
                 // 최근 7일
                 filteredTransactions = transactions.filter(t => {
                     const transactionDate = new Date(t.date);
-                    const daysDiff = Math.floor((now - transactionDate) / (1000 * 60 * 60 * 24));
+                    const daysDiff = Math.floor((now.getTime() - transactionDate.getTime()) / (1000 * 60 * 60 * 24));
                     return daysDiff < 7;
                 });
                 break;
@@ -208,7 +208,7 @@ const ExpenseTracker = () => {
                 // 최근 4주
                 filteredTransactions = transactions.filter(t => {
                     const transactionDate = new Date(t.date);
-                    const weeksDiff = Math.floor((now - transactionDate) / (1000 * 60 * 60 * 24 * 7));
+                    const weeksDiff = Math.floor((now.getTime() - transactionDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
                     return weeksDiff < 4;
                 });
                 break;
@@ -232,7 +232,7 @@ const ExpenseTracker = () => {
         }
 
         // 데이터 그룹핑
-        const grouped = {};
+        const grouped: { [key: string]: { period: string; amount: number; count: number } } = {};
         filteredTransactions.forEach(transaction => {
             const date = new Date(transaction.date);
             let key;

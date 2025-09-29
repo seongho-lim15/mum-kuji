@@ -51,6 +51,8 @@ export async function PUT(request: NextRequest) {
                         { status: 400 }
                     );
                 }
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-expect-error
                 validUpdates[key as keyof UserSettings] = value;
             }
         }

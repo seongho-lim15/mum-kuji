@@ -1106,7 +1106,7 @@ const ExpenseTracker = () => {
                         </div>
 
                         {/* 날짜 선택 */}
-                        <div className="mb-6">
+                        <div className="mb-6 w-full">
                             <label className="block text-sm text-gray-600 mb-2">날짜</label>
                             <input
                                 type="date"

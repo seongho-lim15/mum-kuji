@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     try {
         const email = await DataService.validateUserAccess(request);
-        const { amount, unitPrice, quantity, description, category, date } = await request.json();
+        const { amount, unitPrice, quantity, description, category, date, itemId } = await request.json();
 
         // 입력 검증
         if (!amount || !unitPrice || !quantity || !description || !category || !date) {
@@ -50,7 +50,8 @@ export async function POST(request: NextRequest) {
             description: description.trim(),
             category: category.trim(),
             date: date,
-            timestamp: new Date(date).getTime()
+            timestamp: new Date(date).getTime(),
+            itemId: itemId || undefined
         };
 
         const transactions = await DataService.addUserTransaction(email, newTransaction);
@@ -88,7 +89,7 @@ export async function PUT(request: NextRequest) {
             );
         }
 
-        const { amount, unitPrice, quantity, description, category, date } = await request.json();
+        const { amount, unitPrice, quantity, description, category, date, itemId } = await request.json();
 
         // 입력 검증
         if (!amount || !unitPrice || !quantity || !description || !category || !date) {
@@ -111,7 +112,8 @@ export async function PUT(request: NextRequest) {
             quantity: parseInt(quantity),
             description: description.trim(),
             category: category.trim(),
-            date: date
+            date: date,
+            itemId: itemId || undefined
         };
 
         const transactions = await DataService.updateUserTransaction(email, parseInt(transactionId), updatedTransactionData);

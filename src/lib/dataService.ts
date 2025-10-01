@@ -2,6 +2,7 @@ import { kv } from '@vercel/kv';
 import { AuthService } from './auth';
 
 export interface Item {
+    id: string;
     name: string;
     price: number;
     category: string;
@@ -16,6 +17,7 @@ export interface Transaction {
     category: string;
     date: string;
     timestamp: number;
+    itemId?: string; // 품목 ID 참조 (기존 데이터 호환성을 위해 optional)
 }
 
 export interface UserSettings {
@@ -37,15 +39,20 @@ export class DataService {
         return `user-settings:${email.toLowerCase()}`;
     }
 
+    // 고유 ID 생성 함수
+    private static generateItemId(): string {
+        return `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+
     // 기본 품목 리스트
     private static getDefaultItems(): Item[] {
         return [
-            { name: '원피스', price: 13000, category: '만화' },
-            { name: '나루토', price: 12000, category: '만화' },
-            { name: '블리치', price: 11000, category: '만화' },
-            { name: '커피', price: 4500, category: '음료' },
-            { name: '점심', price: 8000, category: '식사' },
-            { name: '지하철', price: 1500, category: '교통' }
+            { id: this.generateItemId(), name: '원피스', price: 13000, category: '만화' },
+            { id: this.generateItemId(), name: '나루토', price: 12000, category: '만화' },
+            { id: this.generateItemId(), name: '블리치', price: 11000, category: '만화' },
+            { id: this.generateItemId(), name: '커피', price: 4500, category: '음료' },
+            { id: this.generateItemId(), name: '점심', price: 8000, category: '식사' },
+            { id: this.generateItemId(), name: '지하철', price: 1500, category: '교통' }
         ];
     }
 
@@ -69,10 +76,23 @@ export class DataService {
             return defaultItems;
         }
 
-        return items;
+        // 기존 데이터에 ID가 없는 경우 마이그레이션
+        const migratedItems = items.map(item => {
+            if (!item.id) {
+                return { ...item, id: this.generateItemId() };
+            }
+            return item;
+        });
+
+        // 마이그레이션이 일어났다면 저장
+        if (migratedItems.some((item, index) => item.id !== items[index]?.id)) {
+            await kv.set(itemsKey, migratedItems);
+        }
+
+        return migratedItems;
     }
 
-    static async addUserItem(email: string, item: Item): Promise<Item[]> {
+    static async addUserItem(email: string, item: Omit<Item, 'id'>): Promise<Item[]> {
         const items = await this.getUserItems(email);
 
         // 중복 체크
@@ -80,14 +100,37 @@ export class DataService {
             throw new Error('이미 존재하는 품목입니다');
         }
 
-        const newItems = [...items, item];
+        // 새 품목에 ID 할당
+        const newItem: Item = {
+            ...item,
+            id: this.generateItemId()
+        };
+
+        const newItems = [...items, newItem];
         await kv.set(this.getItemsKey(email), newItems);
         return newItems;
     }
 
-    static async removeUserItem(email: string, itemName: string): Promise<Item[]> {
+    static async updateUserItem(email: string, itemId: string, updatedData: Omit<Item, 'id'>): Promise<Item[]> {
         const items = await this.getUserItems(email);
-        const newItems = items.filter(item => item.name !== itemName);
+
+        // 중복 체크 (자기 자신 제외)
+        const duplicateItem = items.find(item => item.id !== itemId && item.name === updatedData.name);
+        if (duplicateItem) {
+            throw new Error('이미 존재하는 품목명입니다');
+        }
+
+        const newItems = items.map(item =>
+            item.id === itemId ? { ...updatedData, id: itemId } : item
+        );
+
+        await kv.set(this.getItemsKey(email), newItems);
+        return newItems;
+    }
+
+    static async removeUserItem(email: string, itemId: string): Promise<Item[]> {
+        const items = await this.getUserItems(email);
+        const newItems = items.filter(item => item.id !== itemId);
         await kv.set(this.getItemsKey(email), newItems);
         return newItems;
     }
@@ -96,7 +139,21 @@ export class DataService {
     static async getUserTransactions(email: string): Promise<Transaction[]> {
         const transactionsKey = this.getTransactionsKey(email);
         const transactions = await kv.get<Transaction[]>(transactionsKey);
-        return transactions || [];
+
+        if (!transactions) {
+            return [];
+        }
+
+        // 기존 데이터에 itemId가 없는 경우 마이그레이션
+        // 현재는 단순히 undefined로 설정 (필요시 나중에 품목명으로 매칭 로직 추가 가능)
+        const migratedTransactions = transactions.map(transaction => {
+            if (transaction.itemId === undefined) {
+                return { ...transaction, itemId: undefined };
+            }
+            return transaction;
+        });
+
+        return migratedTransactions;
     }
 
     static async addUserTransaction(email: string, transaction: Transaction): Promise<Transaction[]> {

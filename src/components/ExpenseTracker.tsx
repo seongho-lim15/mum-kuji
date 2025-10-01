@@ -14,6 +14,7 @@ const ExpenseTracker = () => {
     const [showSettings, setShowSettings] = useState(false);
     const [showEditForm, setShowEditForm] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showAddItemForm, setShowAddItemForm] = useState(false);
     const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
     const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
     const [currentView, setCurrentView] = useState('list');
@@ -39,6 +40,12 @@ const ExpenseTracker = () => {
         category: '만화',
         date: '',
         selectedItem: null as Item | null
+    });
+
+    const [addItemFormData, setAddItemFormData] = useState({
+        name: '',
+        price: '',
+        category: '만화'
     });
 
     // 총 금액 계산 (등록용)
@@ -345,6 +352,35 @@ const ExpenseTracker = () => {
         setEditFormData({...editFormData, quantity: newQuantity.toString()});
     };
 
+    // 품목 추가용 금액 증감 함수
+    const adjustAddItemPrice = (amount: number) => {
+        const currentPrice = parseFloat(addItemFormData.price) || 0;
+        const newPrice = Math.max(0, currentPrice + amount);
+        setAddItemFormData({...addItemFormData, price: newPrice.toString()});
+    };
+
+    // 품목 추가 처리
+    const handleAddItemSubmit = async () => {
+        if (!addItemFormData.name || !addItemFormData.price) return;
+
+        setError('');
+
+        const success = await addNewItem({
+            name: addItemFormData.name,
+            price: parseFloat(addItemFormData.price),
+            category: addItemFormData.category
+        });
+
+        if (success) {
+            setAddItemFormData({
+                name: '',
+                price: '',
+                category: '만화'
+            });
+            setShowAddItemForm(false);
+        }
+    };
+
     // 날짜별 데이터 그룹핑
     const getGroupedData = () => {
         const now = new Date();
@@ -482,8 +518,16 @@ const ExpenseTracker = () => {
                     </div>
                     <div className="flex space-x-2">
                         <button
+                            onClick={() => setShowAddItemForm(true)}
+                            className="p-2 hover:bg-white hover:bg-opacity-20 rounded"
+                            title="품목 추가"
+                        >
+                            <Plus size={20} />
+                        </button>
+                        <button
                             onClick={() => setShowSettings(true)}
                             className="p-2 hover:bg-white hover:bg-opacity-20 rounded"
+                            title="설정"
                         >
                             <Settings size={20} />
                         </button>
@@ -1053,6 +1097,95 @@ const ExpenseTracker = () => {
                                 삭제
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 품목 추가 모달 */}
+            {showAddItemForm && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 w-80">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-lg font-semibold">품목 추가</h2>
+                            <button
+                                onClick={() => setShowAddItemForm(false)}
+                                className="text-gray-500 text-xl hover:text-gray-700"
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        {/* 품목명 입력 */}
+                        <div className="mb-4">
+                            <label className="block text-sm text-gray-600 mb-2">품목명</label>
+                            <input
+                                type="text"
+                                placeholder="품목명을 입력하세요"
+                                value={addItemFormData.name}
+                                onChange={(e) => setAddItemFormData({...addItemFormData, name: e.target.value})}
+                                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:border-blue-500"
+                            />
+                        </div>
+
+                        {/* 단가 입력 */}
+                        <div className="mb-4">
+                            <label className="block text-sm text-gray-600 mb-2">단가</label>
+                            <div className="flex items-center space-x-2">
+                                <div className="flex-1 relative">
+                                    <DollarSign className="absolute left-3 top-3 text-gray-400" size={20} />
+                                    <input
+                                        type="number"
+                                        placeholder="0"
+                                        value={addItemFormData.price}
+                                        onChange={(e) => setAddItemFormData({...addItemFormData, price: e.target.value})}
+                                        className="w-full pl-10 pr-4 py-3 border rounded-lg text-right text-xl focus:outline-none focus:border-blue-500"
+                                    />
+                                </div>
+                                <div className="flex space-x-1">
+                                    <button
+                                        onClick={() => adjustAddItemPrice(-1000)}
+                                        className="flex-shrink-0 w-12 h-12 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg flex items-center justify-center transition-colors"
+                                        type="button"
+                                    >
+                                        <Minus size={20} />
+                                    </button>
+                                    <button
+                                        onClick={() => adjustAddItemPrice(1000)}
+                                        className="flex-shrink-0 w-12 h-12 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg flex items-center justify-center transition-colors"
+                                        type="button"
+                                    >
+                                        <Plus size={20} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 카테고리 선택 */}
+                        <div className="mb-6">
+                            <label className="block text-sm text-gray-600 mb-2">카테고리</label>
+                            <div className="relative">
+                                <Tag className="absolute left-3 top-3 text-gray-400" size={20} />
+                                <select
+                                    value={addItemFormData.category}
+                                    onChange={(e) => setAddItemFormData({...addItemFormData, category: e.target.value})}
+                                    className="w-full pl-10 pr-4 py-3 border rounded-lg appearance-none focus:outline-none focus:border-blue-500"
+                                >
+                                    <option value="만화">만화</option>
+                                    <option value="음료">음료</option>
+                                    <option value="식사">식사</option>
+                                    <option value="교통">교통</option>
+                                    <option value="기타">기타</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* 저장 버튼 */}
+                        <button
+                            onClick={handleAddItemSubmit}
+                            className="w-full py-3 rounded-lg text-white font-semibold bg-green-600 hover:bg-green-700 transition-colors"
+                        >
+                            품목 추가
+                        </button>
                     </div>
                 </div>
             )}

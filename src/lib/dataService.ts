@@ -10,6 +10,8 @@ export interface Item {
 export interface Transaction {
     id: number;
     amount: number;
+    unitPrice: number;
+    quantity: number;
     description: string;
     category: string;
     date: string;
@@ -107,6 +109,17 @@ export class DataService {
     static async removeUserTransaction(email: string, transactionId: number): Promise<Transaction[]> {
         const transactions = await this.getUserTransactions(email);
         const newTransactions = transactions.filter(t => t.id !== transactionId);
+        await kv.set(this.getTransactionsKey(email), newTransactions);
+        return newTransactions;
+    }
+
+    static async updateUserTransaction(email: string, transactionId: number, updatedTransaction: Omit<Transaction, 'id' | 'timestamp'>): Promise<Transaction[]> {
+        const transactions = await this.getUserTransactions(email);
+        const newTransactions = transactions.map(t =>
+            t.id === transactionId
+                ? { ...updatedTransaction, id: transactionId, timestamp: t.timestamp }
+                : t
+        );
         await kv.set(this.getTransactionsKey(email), newTransactions);
         return newTransactions;
     }

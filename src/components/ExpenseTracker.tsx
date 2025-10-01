@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Plus, Calendar, DollarSign, Tag, Search, Settings, BarChart3, List, Target, LogOut } from 'lucide-react';
+import { Plus, Calendar, DollarSign, Tag, Search, Settings, BarChart3, List, Target, LogOut, Edit2, Trash2, Minus } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAuth } from './AuthProvider';
 import { Item, Transaction, UserSettings } from '@/lib/dataService';
@@ -12,6 +12,10 @@ const ExpenseTracker = () => {
     const [itemList, setItemList] = useState<Item[]>([]);
     const [showForm, setShowForm] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
+    const [showEditForm, setShowEditForm] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+    const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
     const [currentView, setCurrentView] = useState('list');
     const [timeFilter, setTimeFilter] = useState('month');
     const [budget, setBudget] = useState(100000);
@@ -20,12 +24,36 @@ const ExpenseTracker = () => {
     const [error, setError] = useState('');
 
     const [formData, setFormData] = useState({
-        amount: '',
+        unitPrice: '',
+        quantity: '1',
         description: '',
         category: '만화',
         date: new Date().toISOString().split('T')[0],
         selectedItem: null as Item | null
     });
+
+    const [editFormData, setEditFormData] = useState({
+        unitPrice: '',
+        quantity: '1',
+        description: '',
+        category: '만화',
+        date: '',
+        selectedItem: null as Item | null
+    });
+
+    // 총 금액 계산 (등록용)
+    const totalAmount = useMemo(() => {
+        const price = parseFloat(formData.unitPrice) || 0;
+        const qty = parseInt(formData.quantity) || 1;
+        return price * qty;
+    }, [formData.unitPrice, formData.quantity]);
+
+    // 총 금액 계산 (수정용)
+    const editTotalAmount = useMemo(() => {
+        const price = parseFloat(editFormData.unitPrice) || 0;
+        const qty = parseInt(editFormData.quantity) || 1;
+        return price * qty;
+    }, [editFormData.unitPrice, editFormData.quantity]);
 
     // 데이터 로드
     useEffect(() => {
@@ -83,7 +111,8 @@ const ExpenseTracker = () => {
             ...formData,
             selectedItem: item,
             description: item.name,
-            amount: item.price.toString(),
+            unitPrice: item.price.toString(),
+            quantity: '1',
             category: item.category
         });
         setSearchTerm('');
@@ -137,6 +166,28 @@ const ExpenseTracker = () => {
         }
     };
 
+    // 거래 삭제 (API 호출)
+    const deleteTransaction = async (transactionId: number) => {
+        try {
+            const response = await fetch(`/api/data/transactions?id=${transactionId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                const { transactions } = await response.json();
+                setTransactions(transactions);
+                return true;
+            } else {
+                const { error } = await response.json();
+                setError(error);
+                return false;
+            }
+        } catch {
+            setError('거래 삭제 중 오류가 발생했습니다');
+            return false;
+        }
+    };
+
     // 설정 업데이트 (API 호출)
     const updateSettings = async (settings: Partial<UserSettings>) => {
         try {
@@ -156,23 +207,25 @@ const ExpenseTracker = () => {
     };
 
     const handleSubmit = async () => {
-        if (!formData.amount || !formData.description) return;
+        if (!formData.unitPrice || !formData.description || !formData.quantity) return;
 
         setError('');
 
         // 새 품목 추가 (중복되지 않는 경우)
-        if (formData.description && formData.amount &&
+        if (formData.description && formData.unitPrice &&
             !itemList.find(item => item.name === formData.description)) {
             await addNewItem({
                 name: formData.description,
-                price: parseInt(formData.amount),
+                price: parseInt(formData.unitPrice),
                 category: formData.category
             });
         }
 
-        // 거래 추가
+        // 거래 추가 (총 금액과 단가, 수량 저장)
         const success = await addTransaction({
-            amount: parseFloat(formData.amount),
+            amount: totalAmount,
+            unitPrice: parseFloat(formData.unitPrice),
+            quantity: parseInt(formData.quantity),
             description: formData.description,
             category: formData.category,
             date: formData.date
@@ -180,7 +233,8 @@ const ExpenseTracker = () => {
 
         if (success) {
             setFormData({
-                amount: '',
+                unitPrice: '',
+                quantity: '1',
                 description: '',
                 category: '만화',
                 date: new Date().toISOString().split('T')[0],
@@ -188,6 +242,107 @@ const ExpenseTracker = () => {
             });
             setShowForm(false);
         }
+    };
+
+    // 수정 폼 열기
+    const handleEditTransaction = (transaction: Transaction) => {
+        setEditingTransaction(transaction);
+        setEditFormData({
+            unitPrice: transaction.unitPrice ? transaction.unitPrice.toString() : transaction.amount.toString(),
+            quantity: transaction.quantity ? transaction.quantity.toString() : '1',
+            description: transaction.description,
+            category: transaction.category,
+            date: transaction.date,
+            selectedItem: null
+        });
+        setShowEditForm(true);
+    };
+
+    // 수정 처리
+    const handleEditSubmit = async () => {
+        if (!editFormData.unitPrice || !editFormData.description || !editFormData.quantity || !editingTransaction) return;
+
+        setError('');
+
+        try {
+            const response = await fetch(`/api/data/transactions?id=${editingTransaction.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    amount: editTotalAmount,
+                    unitPrice: parseFloat(editFormData.unitPrice),
+                    quantity: parseInt(editFormData.quantity),
+                    description: editFormData.description,
+                    category: editFormData.category,
+                    date: editFormData.date
+                })
+            });
+
+            if (response.ok) {
+                const { transactions } = await response.json();
+                setTransactions(transactions);
+                setEditFormData({
+                    unitPrice: '',
+                    quantity: '1',
+                    description: '',
+                    category: '만화',
+                    date: '',
+                    selectedItem: null
+                });
+                setEditingTransaction(null);
+                setShowEditForm(false);
+            } else {
+                const { error } = await response.json();
+                setError(error);
+            }
+        } catch {
+            setError('거래 수정 중 오류가 발생했습니다');
+        }
+    };
+
+    // 삭제 확인 열기
+    const handleDeleteTransaction = (transaction: Transaction) => {
+        setDeletingTransaction(transaction);
+        setShowDeleteConfirm(true);
+    };
+
+    // 삭제 처리
+    const confirmDelete = async () => {
+        if (!deletingTransaction) return;
+
+        const success = await deleteTransaction(deletingTransaction.id);
+        if (success) {
+            setDeletingTransaction(null);
+            setShowDeleteConfirm(false);
+        }
+    };
+
+    // 금액 증감 함수 (등록용)
+    const adjustAmount = (amount: number) => {
+        const currentAmount = parseFloat(formData.unitPrice) || 0;
+        const newAmount = Math.max(0, currentAmount + amount);
+        setFormData({...formData, unitPrice: newAmount.toString()});
+    };
+
+    // 금액 증감 함수 (수정용)
+    const adjustEditAmount = (amount: number) => {
+        const currentAmount = parseFloat(editFormData.unitPrice) || 0;
+        const newAmount = Math.max(0, currentAmount + amount);
+        setEditFormData({...editFormData, unitPrice: newAmount.toString()});
+    };
+
+    // 수량 증감 함수 (등록용)
+    const adjustQuantity = (amount: number) => {
+        const currentQuantity = parseInt(formData.quantity) || 1;
+        const newQuantity = Math.max(1, currentQuantity + amount);
+        setFormData({...formData, quantity: newQuantity.toString()});
+    };
+
+    // 수량 증감 함수 (수정용)
+    const adjustEditQuantity = (amount: number) => {
+        const currentQuantity = parseInt(editFormData.quantity) || 1;
+        const newQuantity = Math.max(1, currentQuantity + amount);
+        setEditFormData({...editFormData, quantity: newQuantity.toString()});
     };
 
     // 날짜별 데이터 그룹핑
@@ -432,7 +587,9 @@ const ExpenseTracker = () => {
                             </div>
                         ) : (
                             <div className="space-y-3">
-                                {transactions.slice(0, 20).map(transaction => (
+                                {transactions
+                                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                                    .slice(0, 20).map(transaction => (
                                     <div key={transaction.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                                         <div className="flex-1">
                                             <div className="flex items-center mb-1">
@@ -442,8 +599,26 @@ const ExpenseTracker = () => {
                                             </div>
                                             <div className="font-medium">{transaction.description}</div>
                                         </div>
-                                        <div className="font-bold text-red-600">
-                                            -{transaction.amount.toLocaleString()}원
+                                        <div className="flex items-center space-x-3">
+                                            <div className="font-bold text-red-600">
+                                                -{transaction.amount.toLocaleString()}원
+                                            </div>
+                                            <div className="flex space-x-1">
+                                                <button
+                                                    onClick={() => handleEditTransaction(transaction)}
+                                                    className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded"
+                                                    title="수정"
+                                                >
+                                                    <Edit2 size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteTransaction(transaction)}
+                                                    className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
+                                                    title="삭제"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -582,18 +757,77 @@ const ExpenseTracker = () => {
                             />
                         </div>
 
-                        {/* 금액 입력 */}
+                        {/* 단가 입력 */}
                         <div className="mb-4">
-                            <label className="block text-sm text-gray-600 mb-2">금액</label>
-                            <div className="relative">
-                                <DollarSign className="absolute left-3 top-3 text-gray-400" size={20} />
-                                <input
-                                    type="number"
-                                    placeholder="0"
-                                    value={formData.amount}
-                                    onChange={(e) => setFormData({...formData, amount: e.target.value})}
-                                    className="w-full pl-10 pr-4 py-3 border rounded-lg text-right text-xl focus:outline-none focus:border-blue-500"
-                                />
+                            <label className="block text-sm text-gray-600 mb-2">단가</label>
+                            <div className="flex items-center space-x-2">
+                                <div className="flex-1 relative">
+                                    <DollarSign className="absolute left-3 top-3 text-gray-400" size={20} />
+                                    <input
+                                        type="number"
+                                        placeholder="0"
+                                        value={formData.unitPrice}
+                                        onChange={(e) => setFormData({...formData, unitPrice: e.target.value})}
+                                        className="w-full pl-10 pr-4 py-3 border rounded-lg text-right text-xl focus:outline-none focus:border-blue-500"
+                                    />
+                                </div>
+                                <div className="flex space-x-1">
+                                    <button
+                                        onClick={() => adjustAmount(-1000)}
+                                        className="flex-shrink-0 w-12 h-12 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg flex items-center justify-center transition-colors"
+                                        type="button"
+                                    >
+                                        <Minus size={20} />
+                                    </button>
+                                    <button
+                                        onClick={() => adjustAmount(1000)}
+                                        className="flex-shrink-0 w-12 h-12 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg flex items-center justify-center transition-colors"
+                                        type="button"
+                                    >
+                                        <Plus size={20} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 갯수 입력 */}
+                        <div className="mb-4">
+                            <label className="block text-sm text-gray-600 mb-2">갯수</label>
+                            <div className="flex items-center space-x-2">
+                                <div className="flex-1">
+                                    <input
+                                        type="number"
+                                        placeholder="1"
+                                        min="1"
+                                        value={formData.quantity}
+                                        onChange={(e) => setFormData({...formData, quantity: e.target.value})}
+                                        className="w-full px-4 py-3 border rounded-lg text-right text-xl focus:outline-none focus:border-blue-500"
+                                    />
+                                </div>
+                                <div className="flex space-x-1">
+                                    <button
+                                        onClick={() => adjustQuantity(-1)}
+                                        className="flex-shrink-0 w-12 h-12 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg flex items-center justify-center transition-colors"
+                                        type="button"
+                                    >
+                                        <Minus size={20} />
+                                    </button>
+                                    <button
+                                        onClick={() => adjustQuantity(1)}
+                                        className="flex-shrink-0 w-12 h-12 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg flex items-center justify-center transition-colors"
+                                        type="button"
+                                    >
+                                        <Plus size={20} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 총 금액 표시 */}
+                        <div className="mb-4">
+                            <label className="block text-sm text-gray-600 mb-2">총 금액</label>
+                            <div className="w-full px-4 py-3 border rounded-lg text-right text-xl bg-gray-50 text-gray-700 font-bold">
+                                {totalAmount.toLocaleString()}원
                             </div>
                         </div>
 
@@ -637,6 +871,188 @@ const ExpenseTracker = () => {
                         >
                             저장하기
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* 수정 폼 */}
+            {showEditForm && editingTransaction && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end z-50">
+                    <div className="bg-white w-full rounded-t-lg p-4 max-h-[80vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-lg font-semibold">지출 수정</h2>
+                            <button
+                                onClick={() => {
+                                    setShowEditForm(false);
+                                    setEditingTransaction(null);
+                                }}
+                                className="text-gray-500 text-xl hover:text-gray-700"
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        {/* 품목명 입력 */}
+                        <div className="mb-4">
+                            <label className="block text-sm text-gray-600 mb-2">품목명</label>
+                            <input
+                                type="text"
+                                placeholder="품목명을 입력하세요"
+                                value={editFormData.description}
+                                onChange={(e) => setEditFormData({...editFormData, description: e.target.value})}
+                                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:border-blue-500"
+                            />
+                        </div>
+
+                        {/* 단가 입력 */}
+                        <div className="mb-4">
+                            <label className="block text-sm text-gray-600 mb-2">단가</label>
+                            <div className="flex items-center space-x-2">
+                                <div className="flex-1 relative">
+                                    <DollarSign className="absolute left-3 top-3 text-gray-400" size={20} />
+                                    <input
+                                        type="number"
+                                        placeholder="0"
+                                        value={editFormData.unitPrice}
+                                        onChange={(e) => setEditFormData({...editFormData, unitPrice: e.target.value})}
+                                        className="w-full pl-10 pr-4 py-3 border rounded-lg text-right text-xl focus:outline-none focus:border-blue-500"
+                                    />
+                                </div>
+                                <div className="flex space-x-1">
+                                    <button
+                                        onClick={() => adjustEditAmount(-1000)}
+                                        className="flex-shrink-0 w-12 h-12 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg flex items-center justify-center transition-colors"
+                                        type="button"
+                                    >
+                                        <Minus size={20} />
+                                    </button>
+                                    <button
+                                        onClick={() => adjustEditAmount(1000)}
+                                        className="flex-shrink-0 w-12 h-12 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg flex items-center justify-center transition-colors"
+                                        type="button"
+                                    >
+                                        <Plus size={20} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 갯수 입력 */}
+                        <div className="mb-4">
+                            <label className="block text-sm text-gray-600 mb-2">갯수</label>
+                            <div className="flex items-center space-x-2">
+                                <div className="flex-1">
+                                    <input
+                                        type="number"
+                                        placeholder="1"
+                                        min="1"
+                                        value={editFormData.quantity}
+                                        onChange={(e) => setEditFormData({...editFormData, quantity: e.target.value})}
+                                        className="w-full px-4 py-3 border rounded-lg text-right text-xl focus:outline-none focus:border-blue-500"
+                                    />
+                                </div>
+                                <div className="flex space-x-1">
+                                    <button
+                                        onClick={() => adjustEditQuantity(-1)}
+                                        className="flex-shrink-0 w-12 h-12 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg flex items-center justify-center transition-colors"
+                                        type="button"
+                                    >
+                                        <Minus size={20} />
+                                    </button>
+                                    <button
+                                        onClick={() => adjustEditQuantity(1)}
+                                        className="flex-shrink-0 w-12 h-12 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg flex items-center justify-center transition-colors"
+                                        type="button"
+                                    >
+                                        <Plus size={20} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 총 금액 표시 */}
+                        <div className="mb-4">
+                            <label className="block text-sm text-gray-600 mb-2">총 금액</label>
+                            <div className="w-full px-4 py-3 border rounded-lg text-right text-xl bg-gray-50 text-gray-700 font-bold">
+                                {editTotalAmount.toLocaleString()}원
+                            </div>
+                        </div>
+
+                        {/* 카테고리 선택 */}
+                        <div className="mb-4">
+                            <label className="block text-sm text-gray-600 mb-2">카테고리</label>
+                            <div className="relative">
+                                <Tag className="absolute left-3 top-3 text-gray-400" size={20} />
+                                <select
+                                    value={editFormData.category}
+                                    onChange={(e) => setEditFormData({...editFormData, category: e.target.value})}
+                                    className="w-full pl-10 pr-4 py-3 border rounded-lg appearance-none focus:outline-none focus:border-blue-500"
+                                >
+                                    <option value="만화">만화</option>
+                                    <option value="음료">음료</option>
+                                    <option value="식사">식사</option>
+                                    <option value="교통">교통</option>
+                                    <option value="기타">기타</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* 날짜 선택 */}
+                        <div className="mb-6">
+                            <label className="block text-sm text-gray-600 mb-2">날짜</label>
+                            <div className="relative">
+                                <Calendar className="absolute left-3 top-3 text-gray-400" size={20} />
+                                <input
+                                    type="date"
+                                    value={editFormData.date}
+                                    onChange={(e) => setEditFormData({...editFormData, date: e.target.value})}
+                                    className="w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:border-blue-500"
+                                />
+                            </div>
+                        </div>
+
+                        {/* 수정 버튼 */}
+                        <button
+                            onClick={handleEditSubmit}
+                            className="w-full py-3 rounded-lg text-white font-semibold bg-green-600 hover:bg-green-700 transition-colors"
+                        >
+                            수정하기
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* 삭제 확인 모달 */}
+            {showDeleteConfirm && deletingTransaction && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 w-80">
+                        <div className="mb-4">
+                            <h2 className="text-lg font-semibold mb-2">삭제 확인</h2>
+                            <p className="text-gray-600">정말로 삭제하시겠습니까?</p>
+                            <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                                <div className="font-medium">{deletingTransaction.description}</div>
+                                <div className="text-sm text-gray-500">{deletingTransaction.date}</div>
+                                <div className="font-bold text-red-600">-{deletingTransaction.amount.toLocaleString()}원</div>
+                            </div>
+                        </div>
+
+                        <div className="flex space-x-3">
+                            <button
+                                onClick={() => {
+                                    setShowDeleteConfirm(false);
+                                    setDeletingTransaction(null);
+                                }}
+                                className="flex-1 py-3 rounded-lg text-gray-700 font-semibold bg-gray-200 hover:bg-gray-300 transition-colors"
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={confirmDelete}
+                                className="flex-1 py-3 rounded-lg text-white font-semibold bg-red-600 hover:bg-red-700 transition-colors"
+                            >
+                                삭제
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

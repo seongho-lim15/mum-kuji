@@ -20,7 +20,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
 
         // 유효성 검사
         if (!email || !password) {
-            setError('모든 필드를 입력해주세요');
+            setError('모든 필드를 입력해주세요!');
             return;
         }
 

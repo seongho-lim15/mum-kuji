@@ -593,36 +593,41 @@ const ExpenseTracker = () => {
         const transactionsToGroup = filteredTransactions;
 
         // 데이터 그룹핑
-        const grouped: { [key: string]: { period: string; amount: number; count: number } } = {};
+        const grouped: { [key: string]: { period: string; amount: number; count: number; sortKey: string } } = {};
         transactionsToGroup.forEach(transaction => {
             const date = new Date(transaction.date);
             let key;
+            let sortKey;
 
             switch (timeFilter) {
                 case 'day':
                     key = `${date.getMonth() + 1}/${date.getDate()}`;
+                    sortKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
                     break;
                 case 'week':
                     const weekStart = new Date(date);
                     weekStart.setDate(date.getDate() - date.getDay());
                     key = `${weekStart.getMonth() + 1}/${weekStart.getDate()}주`;
+                    sortKey = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, '0')}-${String(weekStart.getDate()).padStart(2, '0')}`;
                     break;
                 case 'month':
                     key = `${date.getFullYear()}.${date.getMonth() + 1}`;
+                    sortKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
                     break;
                 case 'year':
                     key = `${date.getFullYear()}년`;
+                    sortKey = `${date.getFullYear()}`;
                     break;
             }
 
             if (!grouped[key]) {
-                grouped[key] = { period: key, amount: 0, count: 0 };
+                grouped[key] = { period: key, amount: 0, count: 0, sortKey: sortKey };
             }
             grouped[key].amount += transaction.amount;
             grouped[key].count += 1;
         });
 
-        return Object.values(grouped).sort((a, b) => a.period.localeCompare(b.period));
+        return Object.values(grouped).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
     };
 
     // 설정 변경 핸들러들

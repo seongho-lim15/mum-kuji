@@ -25,6 +25,7 @@ const ExpenseTracker = () => {
     const [selectedItemFilter, setSelectedItemFilter] = useState<string>('전체');
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
+    const [selectedMonth, setSelectedMonth] = useState<string>(''); // 월별 조회용 상태
 
     const [formData, setFormData] = useState({
         unitPrice: '',
@@ -565,6 +566,19 @@ const ExpenseTracker = () => {
                     return yearsDiff < 3;
                 });
                 break;
+            case 'monthly':
+                // 특정 월 필터링
+                if (selectedMonth) {
+                    const [year, month] = selectedMonth.split('-').map(Number);
+                    timeFilteredTransactions = transactions.filter(t => {
+                        const transactionDate = new Date(t.date);
+                        return transactionDate.getFullYear() === year &&
+                               transactionDate.getMonth() + 1 === month;
+                    });
+                } else {
+                    timeFilteredTransactions = [];
+                }
+                break;
             default:
                 timeFilteredTransactions = transactions;
                 break;
@@ -696,27 +710,27 @@ const ExpenseTracker = () => {
             <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4">
                 <div className="flex justify-between items-center">
                     <div>
-                        <h1 className="text-xl font-bold">지출 관리</h1>
-                        <p className="text-sm opacity-90">{user}님 환영합니다!</p>
+                        <h1 className="text-xl font-bold text-white">지출 관리</h1>
+                        <p className="text-sm opacity-90 text-white">{user}님 환영합니다!</p>
                     </div>
                     <div className="flex space-x-2">
                         <button
                             onClick={() => setShowAddItemForm(true)}
-                            className="p-2 hover:bg-white hover:bg-opacity-20 rounded"
+                            className="p-2 hover:bg-white hover:bg-opacity-20 rounded text-white hover:text-black transition-colors"
                             title="품목 추가"
                         >
                             <Plus size={20} />
                         </button>
                         <button
                             onClick={() => setShowSettings(true)}
-                            className="p-2 hover:bg-white hover:bg-opacity-20 rounded"
+                            className="p-2 hover:bg-white hover:bg-opacity-20 rounded text-white hover:text-black transition-colors"
                             title="설정"
                         >
                             <Settings size={20} />
                         </button>
                         <button
                             onClick={logout}
-                            className="p-2 hover:bg-white hover:bg-opacity-20 rounded"
+                            className="p-2 hover:bg-white hover:bg-opacity-20 rounded text-white hover:text-black transition-colors"
                             title="로그아웃"
                         >
                             <LogOut size={20} />
@@ -725,15 +739,15 @@ const ExpenseTracker = () => {
                 </div>
 
                 {/* 예산 현황 */}
-                <div className="mt-4">
+                <div className="mt-4 text-white">
                     <div className="flex justify-between text-sm opacity-90">
                         <span>이번 달 예산</span>
                         <span>{budget.toLocaleString()}원</span>
                     </div>
-                    <div className="w-full bg-white bg-opacity-20 rounded-full h-2 mt-2">
+                    <div className="w-full bg-white bg-opacity-20 rounded-full h-3 mt-2">
                         <div
-                            className="bg-white h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${Math.min((thisMonthSpent / budget) * 100, 100)}%` }}
+                            className="bg-green-400 h-3 rounded-full transition-all duration-300"
+                            style={{ width: `${thisMonthSpent > budget ? 100 : (thisMonthSpent / budget) * 100}%` }}
                         ></div>
                     </div>
                     <div className="flex justify-between mt-2">
@@ -775,16 +789,22 @@ const ExpenseTracker = () => {
 
             {/* 기간 필터 */}
             <div className="p-4 bg-gray-50">
-                <div className="flex space-x-2">
+                <div className="flex space-x-2 mb-3">
                     {[
                         { key: 'day', label: '일' },
                         { key: 'week', label: '주' },
                         { key: 'month', label: '월' },
-                        { key: 'year', label: '년' }
+                        { key: 'year', label: '년' },
+                        { key: 'monthly', label: '월별' }
                     ].map(filter => (
                         <button
                             key={filter.key}
-                            onClick={() => handleTimeFilterChange(filter.key)}
+                            onClick={() => {
+                                handleTimeFilterChange(filter.key);
+                                if (filter.key !== 'monthly') {
+                                    setSelectedMonth('');
+                                }
+                            }}
                             className={`px-3 py-1 rounded-full text-sm ${
                                 timeFilter === filter.key
                                     ? 'bg-blue-500 text-white'
@@ -795,6 +815,34 @@ const ExpenseTracker = () => {
                         </button>
                     ))}
                 </div>
+
+                {/* 월별 선택 드롭다운 */}
+                {timeFilter === 'monthly' && (
+                    <div>
+                        <select
+                            value={selectedMonth}
+                            onChange={(e) => setSelectedMonth(e.target.value)}
+                            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500 text-sm"
+                        >
+                            <option value="">월 선택</option>
+                            {(() => {
+                                const months = [];
+                                const now = new Date();
+                                // 최근 12개월 생성
+                                for (let i = 0; i < 12; i++) {
+                                    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                                    const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                                    months.push(
+                                        <option key={yearMonth} value={yearMonth}>
+                                            {date.getFullYear()}년 {date.getMonth() + 1}월
+                                        </option>
+                                    );
+                                }
+                                return months;
+                            })()}
+                        </select>
+                    </div>
+                )}
             </div>
 
             {/* 메인 콘텐츠 */}
@@ -821,7 +869,9 @@ const ExpenseTracker = () => {
                     <div className="text-sm text-green-600 font-medium">
                         {timeFilter === 'day' ? '최근 7일' :
                          timeFilter === 'week' ? '최근 4주' :
-                         timeFilter === 'month' ? '최근 6개월' : '최근 3년'}
+                         timeFilter === 'month' ? '최근 6개월' :
+                         timeFilter === 'year' ? '최근 3년' :
+                         timeFilter === 'monthly' && selectedMonth ? `${selectedMonth.split('-')[0]}년 ${parseInt(selectedMonth.split('-')[1])}월` : '월 선택'}
                         {selectedItemFilter !== '전체' ? ` (${selectedItemFilter})` : ''} 총 지출:
                         <span className="text-green-800 font-bold ml-1">{filteredTotal.toLocaleString()}원</span>
                     </div>
@@ -832,7 +882,9 @@ const ExpenseTracker = () => {
                         <h2 className="text-lg font-semibold mb-4">
                             {timeFilter === 'day' ? '최근 7일' :
                                 timeFilter === 'week' ? '최근 4주' :
-                                    timeFilter === 'month' ? '최근 6개월' : '최근 3년'} 내역
+                                timeFilter === 'month' ? '최근 6개월' :
+                                timeFilter === 'year' ? '최근 3년' :
+                                timeFilter === 'monthly' && selectedMonth ? `${selectedMonth.split('-')[0]}년 ${parseInt(selectedMonth.split('-')[1])}월` : '월 선택'} 내역
                         </h2>
 
                         {filteredTransactions.length === 0 ? (
@@ -955,7 +1007,7 @@ const ExpenseTracker = () => {
                             <h2 className="text-lg font-semibold">지출 추가</h2>
                             <button
                                 onClick={() => setShowForm(false)}
-                                className="text-gray-500 text-xl hover:text-gray-700"
+                                className="text-gray-500 text-3xl hover:text-gray-700 w-10 h-10 flex items-center justify-center"
                             >
                                 ×
                             </button>
@@ -1145,7 +1197,7 @@ const ExpenseTracker = () => {
                                     setEditingTransaction(null);
                                     setEditSearchTerm('');
                                 }}
-                                className="text-gray-500 text-xl hover:text-gray-700"
+                                className="text-gray-500 text-3xl hover:text-gray-700 w-10 h-10 flex items-center justify-center"
                             >
                                 ×
                             </button>

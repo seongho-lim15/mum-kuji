@@ -26,6 +26,8 @@ const ExpenseTracker = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
     const [selectedMonth, setSelectedMonth] = useState<string>(''); // 월별 조회용 상태
+    const [calendarDate, setCalendarDate] = useState(new Date()); // 캘린더 현재 표시 월
+    const [selectedDate, setSelectedDate] = useState<string | null>(null); // 선택된 날짜
 
     const [formData, setFormData] = useState({
         unitPrice: '',
@@ -785,99 +787,114 @@ const ExpenseTracker = () => {
                     <BarChart3 size={18} />
                     <span>그래프</span>
                 </button>
+                <button
+                    onClick={() => handleViewChange('calendar')}
+                    className={`flex-1 py-3 flex items-center justify-center space-x-2 ${
+                        currentView === 'calendar' ? 'bg-white shadow-sm' : ''
+                    }`}
+                >
+                    <Calendar size={18} />
+                    <span>캘린더</span>
+                </button>
             </div>
 
-            {/* 기간 필터 */}
-            <div className="p-4 bg-gray-50">
-                <div className="flex space-x-2 mb-3">
-                    {[
-                        { key: 'day', label: '일' },
-                        { key: 'week', label: '주' },
-                        { key: 'month', label: '월' },
-                        { key: 'year', label: '년' },
-                        { key: 'monthly', label: '월별' }
-                    ].map(filter => (
-                        <button
-                            key={filter.key}
-                            onClick={() => {
-                                handleTimeFilterChange(filter.key);
-                                if (filter.key !== 'monthly') {
-                                    setSelectedMonth('');
-                                }
-                            }}
-                            className={`px-3 py-1 rounded-full text-sm ${
-                                timeFilter === filter.key
-                                    ? 'bg-blue-500 text-white'
-                                    : 'bg-white text-gray-600'
-                            }`}
-                        >
-                            {filter.label}
-                        </button>
-                    ))}
-                </div>
-
-                {/* 월별 선택 드롭다운 */}
-                {timeFilter === 'monthly' && (
-                    <div>
-                        <select
-                            value={selectedMonth}
-                            onChange={(e) => setSelectedMonth(e.target.value)}
-                            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500 text-sm"
-                        >
-                            <option value="">월 선택</option>
-                            {(() => {
-                                const months = [];
-                                const now = new Date();
-                                // 최근 12개월 생성
-                                for (let i = 0; i < 12; i++) {
-                                    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                                    const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                                    months.push(
-                                        <option key={yearMonth} value={yearMonth}>
-                                            {date.getFullYear()}년 {date.getMonth() + 1}월
-                                        </option>
-                                    );
-                                }
-                                return months;
-                            })()}
-                        </select>
+            {/* 기간 필터 - 캘린더 탭에서는 숨김 */}
+            {currentView !== 'calendar' && (
+                <div className="p-4 bg-gray-50">
+                    <div className="flex space-x-2 mb-3">
+                        {[
+                            { key: 'day', label: '일' },
+                            { key: 'week', label: '주' },
+                            { key: 'month', label: '월' },
+                            { key: 'year', label: '년' },
+                            { key: 'monthly', label: '월별' }
+                        ].map(filter => (
+                            <button
+                                key={filter.key}
+                                onClick={() => {
+                                    handleTimeFilterChange(filter.key);
+                                    if (filter.key !== 'monthly') {
+                                        setSelectedMonth('');
+                                    }
+                                }}
+                                className={`px-3 py-1 rounded-full text-sm ${
+                                    timeFilter === filter.key
+                                        ? 'bg-blue-500 text-white'
+                                        : 'bg-white text-gray-600'
+                                }`}
+                            >
+                                {filter.label}
+                            </button>
+                        ))}
                     </div>
-                )}
-            </div>
+
+                    {/* 월별 선택 드롭다운 */}
+                    {timeFilter === 'monthly' && (
+                        <div>
+                            <select
+                                value={selectedMonth}
+                                onChange={(e) => setSelectedMonth(e.target.value)}
+                                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500 text-sm"
+                            >
+                                <option value="">월 선택</option>
+                                {(() => {
+                                    const months = [];
+                                    const now = new Date();
+                                    // 최근 12개월 생성
+                                    for (let i = 0; i < 12; i++) {
+                                        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                                        const yearMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                                        months.push(
+                                            <option key={yearMonth} value={yearMonth}>
+                                                {date.getFullYear()}년 {date.getMonth() + 1}월
+                                            </option>
+                                        );
+                                    }
+                                    return months;
+                                })()}
+                            </select>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* 메인 콘텐츠 */}
             <div className="p-4">
-                {/* 품목 필터 */}
-                <div className="mb-4">
-                    <label className="block text-sm text-gray-600 mb-2">품목별 필터</label>
-                    <select
-                        value={selectedItemFilter}
-                        onChange={(e) => setSelectedItemFilter(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500 text-sm"
-                    >
-                        <option value="전체">전체</option>
-                        {itemList.map((item) => (
-                            <option key={item.id} value={item.name}>
-                                {item.name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-
-                {/* 필터링된 기간의 합계 표시 */}
-                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="text-sm text-green-600 font-medium">
-                        {timeFilter === 'day' ? '최근 7일' :
-                         timeFilter === 'week' ? '최근 4주' :
-                         timeFilter === 'month' ? '최근 6개월' :
-                         timeFilter === 'year' ? '최근 3년' :
-                         timeFilter === 'monthly' && selectedMonth ? `${selectedMonth.split('-')[0]}년 ${parseInt(selectedMonth.split('-')[1])}월` : '월 선택'}
-                        {selectedItemFilter !== '전체' ? ` (${selectedItemFilter})` : ''} 총 지출:
-                        <span className="text-green-800 font-bold ml-1">{filteredTotal.toLocaleString()}원</span>
+                {/* 품목 필터 - 캘린더 탭에서는 숨김 */}
+                {currentView !== 'calendar' && (
+                    <div className="mb-4">
+                        <label className="block text-sm text-gray-600 mb-2">품목별 필터</label>
+                        <select
+                            value={selectedItemFilter}
+                            onChange={(e) => setSelectedItemFilter(e.target.value)}
+                            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500 text-sm"
+                        >
+                            <option value="전체">전체</option>
+                            {itemList.map((item) => (
+                                <option key={item.id} value={item.name}>
+                                    {item.name}
+                                </option>
+                            ))}
+                        </select>
                     </div>
-                </div>
+                )}
 
-                {currentView === 'list' ? (
+                {/* 필터링된 기간의 합계 표시 - 캘린더 탭에서는 숨김 */}
+                {currentView !== 'calendar' && (
+                    <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="text-sm text-green-600 font-medium">
+                            {timeFilter === 'day' ? '최근 7일' :
+                             timeFilter === 'week' ? '최근 4주' :
+                             timeFilter === 'month' ? '최근 6개월' :
+                             timeFilter === 'year' ? '최근 3년' :
+                             timeFilter === 'monthly' && selectedMonth ? `${selectedMonth.split('-')[0]}년 ${parseInt(selectedMonth.split('-')[1])}월` : '월 선택'}
+                            {selectedItemFilter !== '전체' ? ` (${selectedItemFilter})` : ''} 총 지출:
+                            <span className="text-green-800 font-bold ml-1">{filteredTotal.toLocaleString()}원</span>
+                        </div>
+                    </div>
+                )}
+
+                {currentView === 'list' && (
                     <div>
                         <h2 className="text-lg font-semibold mb-4">
                             {timeFilter === 'day' ? '최근 7일' :
@@ -932,7 +949,9 @@ const ExpenseTracker = () => {
                             </div>
                         )}
                     </div>
-                ) : (
+                )}
+
+                {currentView === 'chart' && (
                     <div>
                         <h2 className="text-lg font-semibold mb-4">지출 통계</h2>
 
@@ -995,6 +1014,162 @@ const ExpenseTracker = () => {
                                 <p>표시할 데이터가 없어요</p>
                             </div>
                         )}
+                    </div>
+                )}
+
+                {currentView === 'calendar' && (
+                    <div>
+                        <h2 className="text-lg font-semibold mb-4">캘린더</h2>
+
+                        {/* 월 네비게이션 */}
+                        <div className="flex items-center justify-between mb-4">
+                            <button
+                                onClick={() => setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1))}
+                                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm"
+                            >
+                                이전 달
+                            </button>
+                            <div className="text-lg font-semibold">
+                                {calendarDate.getFullYear()}년 {calendarDate.getMonth() + 1}월
+                            </div>
+                            <button
+                                onClick={() => setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1))}
+                                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm"
+                            >
+                                다음 달
+                            </button>
+                        </div>
+
+                        {/* 요일 헤더 */}
+                        <div className="grid grid-cols-7 gap-1 mb-2">
+                            {['일', '월', '화', '수', '목', '금', '토'].map((day, i) => (
+                                <div key={i} className={`text-center text-sm font-semibold py-2 ${
+                                    i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-700'
+                                }`}>
+                                    {day}
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* 캘린더 그리드 */}
+                        <div className="grid grid-cols-7 gap-1 mb-6">
+                            {(() => {
+                                const year = calendarDate.getFullYear();
+                                const month = calendarDate.getMonth();
+                                const firstDay = new Date(year, month, 1).getDay();
+                                const lastDate = new Date(year, month + 1, 0).getDate();
+                                const days = [];
+
+                                // 이전 달 빈 칸
+                                for (let i = 0; i < firstDay; i++) {
+                                    days.push(<div key={`empty-${i}`} className="aspect-square"></div>);
+                                }
+
+                                // 현재 달 날짜들
+                                for (let date = 1; date <= lastDate; date++) {
+                                    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
+                                    const dayTransactions = transactions.filter(t => t.date === dateStr);
+                                    const dayTotal = dayTransactions.reduce((sum, t) => sum + t.amount, 0);
+                                    const isToday = new Date().toISOString().split('T')[0] === dateStr;
+
+                                    days.push(
+                                        <button
+                                            key={date}
+                                            onClick={() => {
+                                                if (dayTotal > 0) {
+                                                    setSelectedDate(dateStr);
+                                                }
+                                            }}
+                                            className={`aspect-square border rounded-lg p-1 text-xs flex flex-col items-center justify-center ${
+                                                isToday ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                                            } ${dayTotal > 0 ? 'hover:bg-gray-100 cursor-pointer' : ''}`}
+                                        >
+                                            <div className={`font-medium ${
+                                                new Date(year, month, date).getDay() === 0 ? 'text-red-500' :
+                                                new Date(year, month, date).getDay() === 6 ? 'text-blue-500' : 'text-gray-700'
+                                            }`}>
+                                                {date}
+                                            </div>
+                                            {dayTotal > 0 && (
+                                                <div className="text-red-600 font-bold mt-1 text-[10px] leading-tight">
+                                                    -{dayTotal.toLocaleString()}
+                                                </div>
+                                            )}
+                                        </button>
+                                    );
+                                }
+
+                                return days;
+                            })()}
+                        </div>
+
+                        {/* 선택된 날짜 상세 내역 (캘린더 아래) */}
+                        {selectedDate && (() => {
+                            const dayTransactions = transactions
+                                .filter(t => t.date === selectedDate)
+                                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                            const dayTotal = dayTransactions.reduce((sum, t) => sum + t.amount, 0);
+
+                            return (
+                                <div className="mt-4 border-t pt-4">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-lg font-semibold">{selectedDate} 내역</h3>
+                                        <button
+                                            onClick={() => setSelectedDate(null)}
+                                            className="text-gray-500 text-2xl hover:text-gray-700"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+
+                                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                        <div className="text-sm text-blue-600 font-medium">
+                                            총 지출: <span className="text-blue-800 font-bold text-lg">{dayTotal.toLocaleString()}원</span>
+                                        </div>
+                                    </div>
+
+                                    {dayTransactions.length === 0 ? (
+                                        <div className="text-center py-12 text-gray-500">
+                                            <p>해당 날짜의 내역이 없어요</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {dayTransactions.map(transaction => (
+                                                <div key={transaction.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center mb-1">
+                                                            <span className="text-sm text-gray-500">{transaction.category}</span>
+                                                        </div>
+                                                        <div className="font-medium">{transaction.description}</div>
+                                                    </div>
+                                                    <div className="flex items-center space-x-3">
+                                                        <div className="font-bold text-red-600">
+                                                            -{transaction.amount.toLocaleString()}원
+                                                        </div>
+                                                        <div className="flex space-x-1">
+                                                            <button
+                                                                onClick={() => handleEditTransaction(transaction)}
+                                                                className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded"
+                                                                title="수정"
+                                                            >
+                                                                <Edit2 size={16} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteTransaction(transaction)}
+                                                                className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
+                                                                title="삭제"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
                     </div>
                 )}
             </div>
@@ -1702,6 +1877,7 @@ const ExpenseTracker = () => {
                     </div>
                 </div>
             )}
+
 
             {/* 추가 버튼 */}
             <button

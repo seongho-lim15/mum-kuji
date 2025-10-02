@@ -45,7 +45,7 @@ export async function PUT(request: NextRequest) {
                 //         { status: 400 }
                 //     );
                 // }
-                if (key === 'currentView' && !['list', 'chart'].includes(value as string)) {
+                if (key === 'currentView' && !['list', 'chart', 'calendar'].includes(value as string)) {
                     return NextResponse.json(
                         { error: '유효하지 않은 뷰 타입입니다' },
                         { status: 400 }

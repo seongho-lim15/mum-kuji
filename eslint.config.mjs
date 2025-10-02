@@ -20,6 +20,12 @@ const eslintConfig = [
       "next-env.d.ts",
     ],
   },
+{
+    rules: {
+        // 'any' 타입 사용을 허용하려면 'off'로 설정합니다.
+        "@typescript-eslint/no-explicit-any": "off",
+    },
+},
 ];
 
 export default eslintConfig;

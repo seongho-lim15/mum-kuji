@@ -838,7 +838,7 @@ const ExpenseTracker = () => {
                             >
                                 <option value="">월 선택</option>
                                 {(() => {
-                                    const months = [];
+                                    const months:any = [];
                                     const now = new Date();
                                     // 최근 12개월 생성
                                     for (let i = 0; i < 12; i++) {
@@ -1058,7 +1058,7 @@ const ExpenseTracker = () => {
                                 const month = calendarDate.getMonth();
                                 const firstDay = new Date(year, month, 1).getDay();
                                 const lastDate = new Date(year, month + 1, 0).getDate();
-                                const days = [];
+                                const days:any = [];
 
                                 // 이전 달 빈 칸
                                 for (let i = 0; i < firstDay; i++) {

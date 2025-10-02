@@ -687,7 +687,7 @@ const ExpenseTracker = () => {
     }
 
     return (
-        <div className="relative max-w-md mx-auto bg-white min-h-screen">
+        <div className="max-w-md mx-auto bg-white min-h-screen">
             {/* 에러 표시 */}
             {error && (
                 <div className="bg-red-50 border-l-4 border-red-400 p-4 mx-4 mt-4 rounded">
@@ -1176,7 +1176,7 @@ const ExpenseTracker = () => {
 
             {/* 입력 폼 */}
             {showForm && (
-                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-end z-50">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end z-50">
                     <div className="bg-white w-full rounded-t-lg p-4 max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-lg font-semibold">지출 추가</h2>
@@ -1362,7 +1362,7 @@ const ExpenseTracker = () => {
 
             {/* 수정 폼 */}
             {showEditForm && editingTransaction && (
-                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-end z-50">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end z-50">
                     <div className="bg-white w-full rounded-t-lg p-4 max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-lg font-semibold">지출 수정</h2>

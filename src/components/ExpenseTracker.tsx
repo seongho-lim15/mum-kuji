@@ -35,7 +35,8 @@ const ExpenseTracker = () => {
         description: '',
         category: '만화',
         date: new Date().toISOString().split('T')[0],
-        selectedItem: null as Item | null
+        selectedItem: null as Item | null,
+        type: 'purchase' as 'purchase' | 'sale'
     });
 
     const [editFormData, setEditFormData] = useState({
@@ -44,7 +45,8 @@ const ExpenseTracker = () => {
         description: '',
         category: '만화',
         date: '',
-        selectedItem: null as Item | null
+        selectedItem: null as Item | null,
+        type: 'purchase' as 'purchase' | 'sale'
     });
 
     const [addItemFormData, setAddItemFormData] = useState({
@@ -275,15 +277,19 @@ const ExpenseTracker = () => {
             }
         }
 
+        // 판매일 경우 금액을 음수로 저장
+        const finalAmount = formData.type === 'sale' ? -totalAmount : totalAmount;
+
         // 거래 추가 (총 금액과 단가, 수량, 품목 ID 저장)
         const success = await addTransaction({
-            amount: totalAmount,
+            amount: finalAmount,
             unitPrice: parseFloat(formData.unitPrice),
             quantity: parseInt(formData.quantity),
             description: formData.description,
             category: formData.category,
             date: formData.date,
-            itemId: selectedItemId
+            itemId: selectedItemId,
+            type: formData.type
         });
 
         if (success) {
@@ -293,7 +299,8 @@ const ExpenseTracker = () => {
                 description: '',
                 category: '만화',
                 date: new Date().toISOString().split('T')[0],
-                selectedItem: null
+                selectedItem: null,
+                type: 'purchase'
             });
             setShowForm(false);
         }
@@ -314,7 +321,8 @@ const ExpenseTracker = () => {
             description: transaction.description,
             category: transaction.category,
             date: transaction.date,
-            selectedItem: existingItem || null
+            selectedItem: existingItem || null,
+            type: transaction.type || 'purchase'
         });
         setEditSearchTerm('');
         setShowEditForm(true);
@@ -334,18 +342,22 @@ const ExpenseTracker = () => {
             selectedItemId = editFormData.selectedItem.id;
         }
 
+        // 판매일 경우 금액을 음수로 저장 (화면에서는 양수로 입력받지만 내부적으로 수익이므로 음수로 표현)
+        const finalAmount = editFormData.type === 'sale' ? -editTotalAmount : editTotalAmount;
+
         try {
             const response = await fetch(`/api/data/transactions?id=${editingTransaction.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    amount: editTotalAmount,
+                    amount: finalAmount,
                     unitPrice: parseFloat(editFormData.unitPrice),
                     quantity: parseInt(editFormData.quantity),
                     description: editFormData.description,
                     category: editFormData.category,
                     date: editFormData.date,
-                    itemId: selectedItemId
+                    itemId: selectedItemId,
+                    type: editFormData.type
                 })
             });
 
@@ -358,7 +370,8 @@ const ExpenseTracker = () => {
                     description: '',
                     category: '만화',
                     date: '',
-                    selectedItem: null
+                    selectedItem: null,
+                    type: 'purchase'
                 });
                 setEditSearchTerm('');
                 setEditingTransaction(null);
@@ -920,12 +933,18 @@ const ExpenseTracker = () => {
                                                 <span className="text-sm text-gray-500">{transaction.category}</span>
                                                 <span className="mx-2 text-gray-300">•</span>
                                                 <span className="text-sm text-gray-500">{transaction.date}</span>
+                                                {transaction.type === 'sale' && (
+                                                    <>
+                                                        <span className="mx-2 text-gray-300">•</span>
+                                                        <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">판매</span>
+                                                    </>
+                                                )}
                                             </div>
                                             <div className="font-medium">{transaction.description}</div>
                                         </div>
                                         <div className="flex items-center space-x-3">
-                                            <div className="font-bold text-red-600">
-                                                -{transaction.amount.toLocaleString()}원
+                                            <div className={`font-bold ${transaction.type === 'sale' ? 'text-green-600' : 'text-red-600'}`}>
+                                                {transaction.type === 'sale' ? '+' : '-'}{Math.abs(transaction.amount).toLocaleString()}원
                                             </div>
                                             <div className="flex space-x-1">
                                                 <button
@@ -1139,12 +1158,18 @@ const ExpenseTracker = () => {
                                                     <div className="flex-1">
                                                         <div className="flex items-center mb-1">
                                                             <span className="text-sm text-gray-500">{transaction.category}</span>
+                                                            {transaction.type === 'sale' && (
+                                                                <>
+                                                                    <span className="mx-2 text-gray-300">•</span>
+                                                                    <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">판매</span>
+                                                                </>
+                                                            )}
                                                         </div>
                                                         <div className="font-medium">{transaction.description}</div>
                                                     </div>
                                                     <div className="flex items-center space-x-3">
-                                                        <div className="font-bold text-red-600">
-                                                            -{transaction.amount.toLocaleString()}원
+                                                        <div className={`font-bold ${transaction.type === 'sale' ? 'text-green-600' : 'text-red-600'}`}>
+                                                            {transaction.type === 'sale' ? '+' : '-'}{Math.abs(transaction.amount).toLocaleString()}원
                                                         </div>
                                                         <div className="flex space-x-1">
                                                             <button
@@ -1225,6 +1250,35 @@ const ExpenseTracker = () => {
                                     )}
                                 </div>
                             )}
+                        </div>
+
+                        {/* 거래 유형 선택 */}
+                        <div className="mb-4">
+                            <label className="block text-sm text-gray-600 mb-2">거래 유형</label>
+                            <div className="flex space-x-4">
+                                <label className="flex items-center cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="formTransactionType"
+                                        value="purchase"
+                                        checked={formData.type === 'purchase'}
+                                        onChange={(e) => setFormData({...formData, type: e.target.value as 'purchase' | 'sale'})}
+                                        className="mr-2 w-4 h-4"
+                                    />
+                                    <span className="text-gray-700">구매</span>
+                                </label>
+                                <label className="flex items-center cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="formTransactionType"
+                                        value="sale"
+                                        checked={formData.type === 'sale'}
+                                        onChange={(e) => setFormData({...formData, type: e.target.value as 'purchase' | 'sale'})}
+                                        className="mr-2 w-4 h-4"
+                                    />
+                                    <span className="text-gray-700">판매</span>
+                                </label>
+                            </div>
                         </div>
 
                         {/* 품목명 입력 */}
@@ -1415,6 +1469,35 @@ const ExpenseTracker = () => {
                                     )}
                                 </div>
                             )}
+                        </div>
+
+                        {/* 거래 유형 선택 */}
+                        <div className="mb-4">
+                            <label className="block text-sm text-gray-600 mb-2">거래 유형</label>
+                            <div className="flex space-x-4">
+                                <label className="flex items-center cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="transactionType"
+                                        value="purchase"
+                                        checked={editFormData.type === 'purchase'}
+                                        onChange={(e) => setEditFormData({...editFormData, type: e.target.value as 'purchase' | 'sale'})}
+                                        className="mr-2 w-4 h-4"
+                                    />
+                                    <span className="text-gray-700">구매</span>
+                                </label>
+                                <label className="flex items-center cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="transactionType"
+                                        value="sale"
+                                        checked={editFormData.type === 'sale'}
+                                        onChange={(e) => setEditFormData({...editFormData, type: e.target.value as 'purchase' | 'sale'})}
+                                        className="mr-2 w-4 h-4"
+                                    />
+                                    <span className="text-gray-700">판매</span>
+                                </label>
+                            </div>
                         </div>
 
                         {/* 품목명 입력 */}

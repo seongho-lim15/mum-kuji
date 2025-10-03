@@ -25,19 +25,20 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     try {
         const email = await DataService.validateUserAccess(request);
-        const { amount, unitPrice, quantity, description, category, date, itemId } = await request.json();
+        const { amount, unitPrice, quantity, description, category, date, itemId, type } = await request.json();
 
         // 입력 검증
-        if (!amount || !unitPrice || !quantity || !description || !category || !date) {
+        if (amount === undefined || amount === null || !unitPrice || !quantity || !description || !category || !date) {
             return NextResponse.json(
                 { error: '모든 필드를 입력해주세요' },
                 { status: 400 }
             );
         }
 
-        if (amount <= 0 || unitPrice <= 0 || quantity <= 0) {
+        // unitPrice와 quantity는 양수여야 함 (amount는 판매 시 음수 가능)
+        if (unitPrice <= 0 || quantity <= 0) {
             return NextResponse.json(
-                { error: '금액과 수량은 0보다 큰 값이어야 합니다' },
+                { error: '단가와 수량은 0보다 큰 값이어야 합니다' },
                 { status: 400 }
             );
         }
@@ -51,7 +52,8 @@ export async function POST(request: NextRequest) {
             category: category.trim(),
             date: date,
             timestamp: new Date(date).getTime(),
-            itemId: itemId || undefined
+            itemId: itemId || undefined,
+            type: type || 'purchase'
         };
 
         const transactions = await DataService.addUserTransaction(email, newTransaction);
@@ -89,19 +91,20 @@ export async function PUT(request: NextRequest) {
             );
         }
 
-        const { amount, unitPrice, quantity, description, category, date, itemId } = await request.json();
+        const { amount, unitPrice, quantity, description, category, date, itemId, type } = await request.json();
 
         // 입력 검증
-        if (!amount || !unitPrice || !quantity || !description || !category || !date) {
+        if (amount === undefined || amount === null || !unitPrice || !quantity || !description || !category || !date) {
             return NextResponse.json(
                 { error: '모든 필드를 입력해주세요' },
                 { status: 400 }
             );
         }
 
-        if (amount <= 0 || unitPrice <= 0 || quantity <= 0) {
+        // unitPrice와 quantity는 양수여야 함 (amount는 판매 시 음수 가능)
+        if (unitPrice <= 0 || quantity <= 0) {
             return NextResponse.json(
-                { error: '금액과 수량은 0보다 큰 값이어야 합니다' },
+                { error: '단가와 수량은 0보다 큰 값이어야 합니다' },
                 { status: 400 }
             );
         }
@@ -113,7 +116,8 @@ export async function PUT(request: NextRequest) {
             description: description.trim(),
             category: category.trim(),
             date: date,
-            itemId: itemId || undefined
+            itemId: itemId || undefined,
+            type: type || 'purchase'
         };
 
         const transactions = await DataService.updateUserTransaction(email, parseInt(transactionId), updatedTransactionData);

@@ -18,6 +18,7 @@ export interface Transaction {
     date: string;
     timestamp: number;
     itemId?: string; // 품목 ID 참조 (기존 데이터 호환성을 위해 optional)
+    type?: 'purchase' | 'sale'; // 구매/판매 구분 (기존 데이터 호환성을 위해 optional, 기본값: purchase)
 }
 
 export interface UserSettings {

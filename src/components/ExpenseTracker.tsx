@@ -1089,19 +1089,20 @@ const ExpenseTracker = () => {
                                     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
                                     const dayTransactions = transactions.filter(t => t.date === dateStr);
                                     const dayTotal = dayTransactions.reduce((sum, t) => sum + t.amount, 0);
+                                    const hasTransactions = dayTransactions.length > 0;
                                     const isToday = new Date().toISOString().split('T')[0] === dateStr;
 
                                     days.push(
                                         <button
                                             key={date}
                                             onClick={() => {
-                                                if (dayTotal > 0) {
+                                                if (hasTransactions) {
                                                     setSelectedDate(dateStr);
                                                 }
                                             }}
                                             className={`aspect-square border rounded-lg p-1 text-xs flex flex-col items-center justify-center ${
                                                 isToday ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                                            } ${dayTotal > 0 ? 'hover:bg-gray-100 cursor-pointer' : ''}`}
+                                            } ${hasTransactions ? 'hover:bg-gray-100 cursor-pointer' : ''}`}
                                         >
                                             <div className={`font-medium ${
                                                 new Date(year, month, date).getDay() === 0 ? 'text-red-500' :
@@ -1109,9 +1110,11 @@ const ExpenseTracker = () => {
                                             }`}>
                                                 {date}
                                             </div>
-                                            {dayTotal > 0 && (
-                                                <div className="text-red-600 font-bold mt-1 text-[10px] leading-tight">
-                                                    -{dayTotal.toLocaleString()}
+                                            {dayTotal !== 0 && (
+                                                <div className={`font-bold mt-1 text-[10px] leading-tight ${
+                                                    dayTotal > 0 ? 'text-red-600' : 'text-green-600'
+                                                }`}>
+                                                    {dayTotal > 0 ? '-' : '+'}{Math.abs(dayTotal).toLocaleString()}
                                                 </div>
                                             )}
                                         </button>
@@ -1372,25 +1375,6 @@ const ExpenseTracker = () => {
                             </div>
                         </div>
 
-                        {/* 카테고리 선택 */}
-                        <div className="mb-4">
-                            <label className="block text-sm text-gray-600 mb-2">카테고리</label>
-                            <div className="relative">
-                                <Tag className="absolute left-3 top-3 text-gray-400" size={20} />
-                                <select
-                                    value={formData.category}
-                                    onChange={(e) => setFormData({...formData, category: e.target.value})}
-                                    className="w-full pl-10 pr-4 py-3 border rounded-lg appearance-none focus:outline-none focus:border-blue-500"
-                                >
-                                    <option value="만화">만화</option>
-                                    <option value="음료">음료</option>
-                                    <option value="식사">식사</option>
-                                    <option value="교통">교통</option>
-                                    <option value="기타">기타</option>
-                                </select>
-                            </div>
-                        </div>
-
                         {/* 날짜 선택 */}
                         <div className="mb-6 w-full">
                             <label className="block text-sm text-gray-600 mb-2">날짜</label>
@@ -1588,25 +1572,6 @@ const ExpenseTracker = () => {
                             <label className="block text-sm text-gray-600 mb-2">총 금액</label>
                             <div className="w-full px-4 py-3 border rounded-lg text-right text-xl bg-gray-50 text-gray-700 font-bold">
                                 {editTotalAmount.toLocaleString()}원
-                            </div>
-                        </div>
-
-                        {/* 카테고리 선택 */}
-                        <div className="mb-4">
-                            <label className="block text-sm text-gray-600 mb-2">카테고리</label>
-                            <div className="relative">
-                                <Tag className="absolute left-3 top-3 text-gray-400" size={20} />
-                                <select
-                                    value={editFormData.category}
-                                    onChange={(e) => setEditFormData({...editFormData, category: e.target.value})}
-                                    className="w-full pl-10 pr-4 py-3 border rounded-lg appearance-none focus:outline-none focus:border-blue-500"
-                                >
-                                    <option value="만화">만화</option>
-                                    <option value="음료">음료</option>
-                                    <option value="식사">식사</option>
-                                    <option value="교통">교통</option>
-                                    <option value="기타">기타</option>
-                                </select>
                             </div>
                         </div>
 

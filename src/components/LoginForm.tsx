@@ -2,12 +2,13 @@
 
 import React, { useState } from 'react';
 import { LogIn, UserPlus, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import {postLogin, postSignUp} from "@/services/auth";
 
 interface LoginFormProps {
     onLoginSuccess: (email: string, token?: string) => void;
 }
 
-const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
+const LoginForm = ({ onLoginSuccess } : LoginFormProps) => {
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -38,20 +39,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess }) => {
         setLoading(true);
 
         try {
-            const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password }),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                setError(data.error || '오류가 발생했습니다');
-                setLoading(false);
-                return;
-            }
+            const handleAuth = isLogin ? postLogin : postSignUp;
+            const data = await handleAuth({email, password});
 
             if (isLogin) {
                 // 로그인 성공 - 토큰과 함께 콜백 호출

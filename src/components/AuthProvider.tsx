@@ -1,13 +1,7 @@
 "use client"
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-
-interface AuthContextType {
-    user: string | null;
-    login: (email: string, token?: string) => void;
-    logout: () => void;
-    isLoading: boolean;
-}
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import {AuthContextType} from "@/types/auth";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -19,7 +13,7 @@ export const useAuth = () => {
     return context;
 };
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider = ({ children } : {children : ReactNode }) => {
     const [user, setUser] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 

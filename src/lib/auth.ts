@@ -1,4 +1,4 @@
-import { kv } from '@vercel/kv';
+import {kv} from '@vercel/kv';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -39,6 +39,11 @@ export class AuthService {
         return newUser;
     }
 
+    /**
+     * 로그인
+     * @param email
+     * @param password
+     */
     static async authenticateUser(email: string, password: string): Promise<User> {
         const userKey = this.getUserKey(email);
 
@@ -77,6 +82,10 @@ export class AuthService {
         return { isValid: true };
     }
 
+    /**
+     * 토큰 생성
+     * @param user
+     */
     static generateToken(user: User): string {
         const secret = process.env.JWT_SECRET || 'your-super-secret-key-change-in-production';
         const payload = {
@@ -93,8 +102,7 @@ export class AuthService {
     static verifyToken(token: string): { email: string; createdAt: string } | null {
         try {
             const secret = process.env.JWT_SECRET || 'your-super-secret-key-change-in-production';
-            const decoded = jwt.verify(token, secret) as { email: string; createdAt: string };
-            return decoded;
+            return jwt.verify(token, secret) as { email: string; createdAt: string };
         } catch {
             return null;
         }

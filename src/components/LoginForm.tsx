@@ -39,17 +39,16 @@ const LoginForm = ({ onLoginSuccess } : LoginFormProps) => {
         setLoading(true);
 
         try {
-            const handleAuth = isLogin ? postLogin : postSignUp;
-            const data = await handleAuth({email, password});
-
+π            // 로그인일 경우
             if (isLogin) {
-                // 로그인 성공 - 토큰과 함께 콜백 호출
-                onLoginSuccess(data.email, data.token);
+                const result = await postLogin({email, password}); // 로그인 API 호출
+                onLoginSuccess(result.email, result.token); // 로그인 성공 - 토큰, 이메일을 콜백 호출해 반환
+            }
+            // 회원가입일 경우
+            else {
+                await postSignUp({email, password}) // 회원가입 API 호출
 
-                // AuthProvider 상태 변경으로 자동으로 ExpenseTracker가 렌더링됨
-                // router.push('/') 제거 - 불필요한 페이지 새로고침 방지
-            } else {
-                // 회원가입 성공
+                // 회원가입 성공 시
                 setIsLogin(true);
                 setPassword('');
                 setError('');

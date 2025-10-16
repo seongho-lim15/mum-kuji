@@ -39,7 +39,7 @@ const LoginForm = ({ onLoginSuccess } : LoginFormProps) => {
         setLoading(true);
 
         try {
-π            // 로그인일 경우
+            // 로그인일 경우
             if (isLogin) {
                 const result = await postLogin({email, password}); // 로그인 API 호출
                 onLoginSuccess(result.email, result.token); // 로그인 성공 - 토큰, 이메일을 콜백 호출해 반환

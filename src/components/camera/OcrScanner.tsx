@@ -188,7 +188,7 @@ export default function OcrScanner() {
         <input
           type="file"
           accept="image/*"
-          capture="environment"
+          // capture="environment"
           onChange={handleImageUpload}
           className="hidden"
           disabled={isLoading}

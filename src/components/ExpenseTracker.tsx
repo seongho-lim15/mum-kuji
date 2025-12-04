@@ -25,6 +25,7 @@ import { AddCategoryRequest } from "@/types/item";
 import { postAddCategory } from "@/api/item";
 import { TimeEnums, ViewEnums } from "@/enums/viewEnums";
 import { ChartTab } from "@/components/tab/ChartTab";
+import OcrScanner from "@/components/camera/OcrScanner";
 
 const ExpenseTracker = () => {
   const { user, logout } = useAuth();
@@ -35,6 +36,7 @@ const ExpenseTracker = () => {
   const [showEditForm, setShowEditForm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAddItemForm, setShowAddItemForm] = useState(false);
+  const [showOcrScannerModal, setShowOcrScannerModal] = useState(false);
   const [editingTransaction, setEditingTransaction] =
     useState<Transaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] =
@@ -97,7 +99,7 @@ const ExpenseTracker = () => {
 
   // 데이터 로드
   useEffect(() => {
-    if (!user) return;
+    if (!user) return; // 로그인 되어있지 않으면 얼리 리턴
 
     const loadData = async () => {
       try {
@@ -649,6 +651,9 @@ const ExpenseTracker = () => {
     await updateSettings({ budget: newBudget });
   };
 
+  /**
+   * 선택된 날짜별 라벨
+   */
   const timeLabel = useMemo(() => {
     switch (timeFilter) {
       case TimeEnums.DAY:
@@ -736,7 +741,7 @@ const ExpenseTracker = () => {
               <Plus size={20} />
             </button>
             <button
-              onClick={() => setShowAddItemForm(true)}
+              onClick={() => setShowOcrScannerModal(!showOcrScannerModal)}
               className="p-2 hover:bg-white hover:bg-opacity-20 rounded text-white hover:text-black transition-colors"
               title="텍스트 인식"
             >
@@ -1779,6 +1784,9 @@ const ExpenseTracker = () => {
           onSetError={() => setError("")}
         />
       )}
+
+      {/* 이치발 쿠지 Ocr 스캐너 모달 오픈 */}
+      {showOcrScannerModal && <OcrScanner />}
 
       {/* 설정 화면 */}
       {showSettings && (

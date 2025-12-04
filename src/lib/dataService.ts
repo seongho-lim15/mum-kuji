@@ -1,6 +1,11 @@
-import { kv } from '@vercel/kv';
 import { AuthService } from './auth';
+import { createClient } from '@vercel/kv';
 
+// 딱 2개만 연결!
+const kv = createClient({
+    url: process.env.KV_MUM_KV_REST_API_URL!,
+    token: process.env.KV_MUM_KV_REST_API_TOKEN!,
+});
 export interface Item {
     id: string;
     name: string;

@@ -1,4 +1,4 @@
-import {kv} from '@vercel/kv';
+import {createClient} from '@vercel/kv';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -7,6 +7,11 @@ export interface User {
     hashedPassword: string;
     createdAt: string;
 }
+
+const kv = createClient({
+    url: process.env.KV_MUM_KV_REST_API_URL!,
+    token: process.env.KV_MUM_KV_REST_API_TOKEN!,
+});
 
 export class AuthService {
     private static getUserKey(email: string): string {

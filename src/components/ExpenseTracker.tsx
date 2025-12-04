@@ -17,22 +17,14 @@ import {
   Minus,
   Camera,
 } from "lucide-react";
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+
 import { useAuth } from "./AuthProvider";
 import { Item, Transaction, UserSettings } from "@/services/dataService";
 import { CategoryAddModal } from "@/components/modal/CategoryAddModal";
 import { AddCategoryRequest } from "@/types/item";
 import { postAddCategory } from "@/api/item";
+import { TimeEnums, ViewEnums } from "@/enums/viewEnums";
+import { ChartTab } from "@/components/tab/ChartTab";
 
 const ExpenseTracker = () => {
   const { user, logout } = useAuth();
@@ -47,7 +39,7 @@ const ExpenseTracker = () => {
     useState<Transaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] =
     useState<Transaction | null>(null);
-  const [currentView, setCurrentView] = useState("list");
+  const [currentView, setCurrentView] = useState<ViewEnums>(ViewEnums.LIST);
   const [timeFilter, setTimeFilter] = useState("month");
   const [budget, setBudget] = useState(100000);
   const [searchTerm, setSearchTerm] = useState("");
@@ -89,7 +81,6 @@ const ExpenseTracker = () => {
     price: "",
     category: "만화",
   });
-
   // 총 금액 계산 (등록용)
   const totalAmount = useMemo(() => {
     const price = parseFloat(formData.unitPrice) || 0;
@@ -202,9 +193,10 @@ const ExpenseTracker = () => {
    */
   const addNewItem = async (item: AddCategoryRequest) => {
     try {
-      const response = await postAddCategory(item); // 새품목 추가 API 호출
-      console.log("response: ", response);
-      const { items } = response.items;
+      const result = await postAddCategory(item); // 새품목 추가 API 호출
+      console.log("result: ", result);
+      const { items } = result;
+
       setItemList(items);
       return items[items.length - 1]; // 새로 추가된 품목 반환
     } catch {
@@ -556,7 +548,7 @@ const ExpenseTracker = () => {
     let timeFilteredTransactions: Transaction[] = [];
 
     switch (timeFilter) {
-      case "day":
+      case TimeEnums.DAY:
         // 최근 7일
         timeFilteredTransactions = transactions.filter((t) => {
           const transactionDate = new Date(t.date);
@@ -566,7 +558,7 @@ const ExpenseTracker = () => {
           return daysDiff < 7;
         });
         break;
-      case "week":
+      case TimeEnums.WEEK:
         // 최근 4주
         timeFilteredTransactions = transactions.filter((t) => {
           const transactionDate = new Date(t.date);
@@ -577,7 +569,7 @@ const ExpenseTracker = () => {
           return weeksDiff < 4;
         });
         break;
-      case "month":
+      case TimeEnums.MONTH:
         // 최근 6개월
         timeFilteredTransactions = transactions.filter((t) => {
           const transactionDate = new Date(t.date);
@@ -587,7 +579,7 @@ const ExpenseTracker = () => {
           return monthsDiff < 6;
         });
         break;
-      case "year":
+      case TimeEnums.YEAR:
         // 최근 3년
         timeFilteredTransactions = transactions.filter((t) => {
           const transactionDate = new Date(t.date);
@@ -595,7 +587,7 @@ const ExpenseTracker = () => {
           return yearsDiff < 3;
         });
         break;
-      case "monthly":
+      case TimeEnums.MONTHLY:
         // 특정 월 필터링
         if (selectedMonth) {
           const [year, month] = selectedMonth.split("-").map(Number);
@@ -641,65 +633,13 @@ const ExpenseTracker = () => {
     0,
   );
 
-  // 날짜별 데이터 그룹핑
-  const getGroupedData = () => {
-    // 이미 필터링된 거래 목록 사용
-    const transactionsToGroup = filteredTransactions;
-
-    // 데이터 그룹핑
-    const grouped: {
-      [key: string]: {
-        period: string;
-        amount: number;
-        count: number;
-        sortKey: string;
-      };
-    } = {};
-    transactionsToGroup.forEach((transaction) => {
-      const date = new Date(transaction.date);
-      let key;
-      let sortKey;
-
-      switch (timeFilter) {
-        case "day":
-          key = `${date.getMonth() + 1}/${date.getDate()}`;
-          sortKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-          break;
-        case "week":
-          const weekStart = new Date(date);
-          weekStart.setDate(date.getDate() - date.getDay());
-          key = `${weekStart.getMonth() + 1}/${weekStart.getDate()}주`;
-          sortKey = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, "0")}-${String(weekStart.getDate()).padStart(2, "0")}`;
-          break;
-        case "month":
-          key = `${date.getFullYear()}.${date.getMonth() + 1}`;
-          sortKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-          break;
-        case "year":
-          key = `${date.getFullYear()}년`;
-          sortKey = `${date.getFullYear()}`;
-          break;
-      }
-
-      if (!grouped[key]) {
-        grouped[key] = { period: key, amount: 0, count: 0, sortKey: sortKey };
-      }
-      grouped[key].amount += transaction.amount;
-      grouped[key].count += 1;
-    });
-
-    return Object.values(grouped).sort((a, b) =>
-      a.sortKey.localeCompare(b.sortKey),
-    );
-  };
-
   // 설정 변경 핸들러들
-  const handleViewChange = async (view: string) => {
+  const handleViewChange = async (view: ViewEnums) => {
     setCurrentView(view);
     await updateSettings({ currentView: view });
   };
 
-  const handleTimeFilterChange = async (filter: string) => {
+  const handleTimeFilterChange = async (filter: TimeEnums) => {
     setTimeFilter(filter);
     await updateSettings({ timeFilter: filter });
   };
@@ -709,7 +649,26 @@ const ExpenseTracker = () => {
     await updateSettings({ budget: newBudget });
   };
 
-  const chartData = getGroupedData();
+  const timeLabel = useMemo(() => {
+    switch (timeFilter) {
+      case TimeEnums.DAY:
+        return "최근 7일";
+      case TimeEnums.WEEK:
+        return "최근 4주";
+      case TimeEnums.MONTH:
+        return "최근 6개월";
+      case TimeEnums.YEAR:
+        return "최근 3년";
+      case TimeEnums.MONTHLY:
+        if (selectedMonth) {
+          return `${selectedMonth.split("-")[0]}년 ${parseInt(selectedMonth.split("-")[1])}월`;
+        } else {
+          return "월 선택";
+        }
+      default:
+        return "월 선택";
+    }
+  }, [timeFilter, selectedMonth]);
 
   // 이번 달 지출 계산
   const thisMonthSpent = transactions
@@ -836,27 +795,27 @@ const ExpenseTracker = () => {
       {/* 탭 메뉴 */}
       <div className="flex bg-gray-100">
         <button
-          onClick={() => handleViewChange("list")}
+          onClick={() => handleViewChange(ViewEnums.LIST)}
           className={`flex-1 py-3 flex items-center justify-center space-x-2 ${
-            currentView === "list" ? "bg-white shadow-sm" : ""
+            currentView === ViewEnums.LIST ? "bg-white shadow-sm" : ""
           }`}
         >
           <List size={18} />
           <span>리스트</span>
         </button>
         <button
-          onClick={() => handleViewChange("chart")}
+          onClick={() => handleViewChange(ViewEnums.CHART)}
           className={`flex-1 py-3 flex items-center justify-center space-x-2 ${
-            currentView === "chart" ? "bg-white shadow-sm" : ""
+            currentView === ViewEnums.CHART ? "bg-white shadow-sm" : ""
           }`}
         >
           <BarChart3 size={18} />
           <span>그래프</span>
         </button>
         <button
-          onClick={() => handleViewChange("calendar")}
+          onClick={() => handleViewChange(ViewEnums.CALENDAR)}
           className={`flex-1 py-3 flex items-center justify-center space-x-2 ${
-            currentView === "calendar" ? "bg-white shadow-sm" : ""
+            currentView === ViewEnums.CALENDAR ? "bg-white shadow-sm" : ""
           }`}
         >
           <Calendar size={18} />
@@ -865,15 +824,15 @@ const ExpenseTracker = () => {
       </div>
 
       {/* 기간 필터 - 캘린더 탭에서는 숨김 */}
-      {currentView !== "calendar" && (
+      {currentView !== ViewEnums.CALENDAR && (
         <div className="p-4 bg-gray-50">
           <div className="flex space-x-2 mb-3">
             {[
-              { key: "day", label: "일" },
-              { key: "week", label: "주" },
-              { key: "month", label: "월" },
-              { key: "year", label: "년" },
-              { key: "monthly", label: "월별" },
+              { key: TimeEnums.DAY, label: "일" },
+              { key: TimeEnums.WEEK, label: "주" },
+              { key: TimeEnums.MONTH, label: "월" },
+              { key: TimeEnums.YEAR, label: "년" },
+              { key: TimeEnums.MONTHLY, label: "월별" },
             ].map((filter) => (
               <button
                 key={filter.key}
@@ -895,7 +854,7 @@ const ExpenseTracker = () => {
           </div>
 
           {/* 월별 선택 드롭다운 */}
-          {timeFilter === "monthly" && (
+          {timeFilter === TimeEnums.MONTHLY && (
             <div>
               <select
                 value={selectedMonth}
@@ -931,7 +890,7 @@ const ExpenseTracker = () => {
       {/* 메인 콘텐츠 */}
       <div className="p-4">
         {/* 품목 필터 - 캘린더 탭에서는 숨김 */}
-        {currentView !== "calendar" && (
+        {currentView !== ViewEnums.CALENDAR && (
           <div className="mb-4">
             <label className="block text-sm text-gray-600 mb-2">
               품목별 필터
@@ -952,21 +911,13 @@ const ExpenseTracker = () => {
         )}
 
         {/* 필터링된 기간의 합계 표시 - 캘린더 탭에서는 숨김 */}
-        {currentView !== "calendar" && (
+        {currentView !== ViewEnums.CALENDAR && (
           <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
             <div className="text-sm text-green-600 font-medium">
-              {timeFilter === "day"
-                ? "최근 7일"
-                : timeFilter === "week"
-                  ? "최근 4주"
-                  : timeFilter === "month"
-                    ? "최근 6개월"
-                    : timeFilter === "year"
-                      ? "최근 3년"
-                      : timeFilter === "monthly" && selectedMonth
-                        ? `${selectedMonth.split("-")[0]}년 ${parseInt(selectedMonth.split("-")[1])}월`
-                        : "월 선택"}
-              {selectedItemFilter !== "전체" ? ` (${selectedItemFilter})` : ""}{" "}
+              {timeLabel}
+              {selectedItemFilter !== "전체"
+                ? ` (${selectedItemFilter})`
+                : ""}{" "}
               총 지출:
               <span className="text-green-800 font-bold ml-1">
                 {filteredTotal.toLocaleString()}원
@@ -975,20 +926,10 @@ const ExpenseTracker = () => {
           </div>
         )}
 
-        {currentView === "list" && (
+        {currentView === ViewEnums.LIST && (
           <div>
             <h2 className="text-lg font-semibold mb-4">
-              {timeFilter === "day"
-                ? "최근 7일"
-                : timeFilter === "week"
-                  ? "최근 4주"
-                  : timeFilter === "month"
-                    ? "최근 6개월"
-                    : timeFilter === "year"
-                      ? "최근 3년"
-                      : timeFilter === "monthly" && selectedMonth
-                        ? `${selectedMonth.split("-")[0]}년 ${parseInt(selectedMonth.split("-")[1])}월`
-                        : "월 선택"}{" "}
+              {timeLabel}
               내역
             </h2>
 
@@ -1064,98 +1005,14 @@ const ExpenseTracker = () => {
           </div>
         )}
 
-        {currentView === "chart" && (
-          <div>
-            <h2 className="text-lg font-semibold mb-4">지출 통계</h2>
-
-            {chartData.length > 0 ? (
-              <div className="space-y-6">
-                {/* 막대 그래프 */}
-                <div className="bg-white p-4 rounded-lg shadow-sm">
-                  <h3 className="text-sm font-medium text-gray-600 mb-3">
-                    {timeFilter === "day"
-                      ? "일별"
-                      : timeFilter === "week"
-                        ? "주별"
-                        : timeFilter === "month"
-                          ? "월별"
-                          : "년별"}{" "}
-                    지출
-                  </h3>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="period" />
-                      <YAxis />
-                      <Tooltip
-                        formatter={(value) => [
-                          `${value.toLocaleString()}원`,
-                          "지출액",
-                        ]}
-                      />
-                      <Bar dataKey="amount" fill="#3B82F6" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* 라인 그래프 */}
-                <div className="bg-white p-4 rounded-lg shadow-sm">
-                  <h3 className="text-sm font-medium text-gray-600 mb-3">
-                    지출 추이
-                  </h3>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="period" />
-                      <YAxis />
-                      <Tooltip
-                        formatter={(value) => [
-                          `${value.toLocaleString()}원`,
-                          "지출액",
-                        ]}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="amount"
-                        stroke="#8B5CF6"
-                        strokeWidth={2}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* 통계 요약 */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-blue-50 p-3 rounded-lg">
-                    <div className="text-sm text-blue-600">총 지출</div>
-                    <div className="text-lg font-bold text-blue-700">
-                      {chartData
-                        .reduce((sum, item) => sum + item.amount, 0)
-                        .toLocaleString()}
-                      원
-                    </div>
-                  </div>
-                  <div className="bg-green-50 p-3 rounded-lg">
-                    <div className="text-sm text-green-600">평균 지출</div>
-                    <div className="text-lg font-bold text-green-700">
-                      {Math.round(
-                        chartData.reduce((sum, item) => sum + item.amount, 0) /
-                          Math.max(chartData.length, 1),
-                      ).toLocaleString()}
-                      원
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-12 text-gray-500">
-                <p>표시할 데이터가 없어요</p>
-              </div>
-            )}
-          </div>
+        {currentView === ViewEnums.CHART && (
+          <ChartTab
+            timeFilter={timeFilter}
+            filteredTransactions={filteredTransactions}
+          />
         )}
 
-        {currentView === "calendar" && (
+        {currentView === ViewEnums.CALENDAR && (
           <div>
             <h2 className="text-lg font-semibold mb-4">캘린더</h2>
 

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { LogIn, UserPlus, Mail, Lock, Eye, EyeOff } from "lucide-react";
-import { postLogin, postSignUp } from "@/lib/auth-api";
+import { postLogin, postSignUp } from "@/api/auth";
 
 interface LoginFormProps {
   onLoginSuccess: (email: string, token?: string) => void;

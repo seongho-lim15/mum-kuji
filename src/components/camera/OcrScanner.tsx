@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { createWorker } from "tesseract.js";
+import Tesseract, { createWorker } from "tesseract.js";
 
 interface ScanResult {
   id: number;
@@ -9,33 +9,18 @@ interface ScanResult {
   imageUrl: string;
 }
 
-export default function OcrScanner() {
+const OcrScanner = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [statusText, setStatusText] = useState("");
+  const [statusText, setStatusText] = useState(""); // 스캐너 상태를 나타내는 텍스트
   const [results, setResults] = useState<ScanResult[]>([]);
 
   // Tesseract Worker 인스턴스 관리
   const workerRef = useRef<Tesseract.Worker | null>(null);
 
-  // 컴포넌트 마운트 시 Worker 미리 로드 (성능 최적화)
+  /**
+   * 컴포넌트 마운트 시 Worker 미리 로드 (성능 최적화)
+   */
   useEffect(() => {
-    const initWorker = async () => {
-      // [변경점] v5에서는 createWorker에 언어를 바로 넣습니다.
-      // createWorker('언어', OEM(엔진모드), 로거옵션)
-      const worker = await createWorker("eng", 1, {
-        logger: (m) => console.log(m),
-      });
-
-      // loadLanguage, initialize는 이제 필요 없습니다. (자동 수행됨)
-
-      // ★ 화이트리스트 설정은 그대로 유지
-      await worker.setParameters({
-        tessedit_char_whitelist: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-",
-      });
-
-      workerRef.current = worker;
-    };
-
     initWorker();
 
     return () => {
@@ -46,55 +31,104 @@ export default function OcrScanner() {
     };
   }, []);
 
-  // 이미지 전처리: 확대(Upscale) + 회색조(Grayscale)
+  const initWorker = async () => {
+    // createWorker('언어', OEM(엔진모드), 로거옵션)
+    const worker = await createWorker(["kor", "eng"], 1);
+
+    // await worker.setParameters({
+    //   tessedit_char_whitelist: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-",
+    // });
+
+    workerRef.current = worker;
+  };
+
+  /**
+   * 이미지 전처리: 확대(Upscale) + 회색조(Grayscale)
+   * @param imageFile
+   */
   const preprocessImage = (imageFile: File): Promise<string> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const img = new Image();
       img.src = URL.createObjectURL(imageFile);
+
       img.onload = () => {
+        URL.revokeObjectURL(img.src); // 메모리 정리 추가
+
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
 
-        // ★ 핵심: 이미지 크기를 2배로 뻥튀기 (작은 글씨 인식률 비약적 상승)
-        const scaleFactor = 2;
-        canvas.width = img.width * scaleFactor;
-        canvas.height = img.height * scaleFactor;
+        const MAX_DIMENSION = 2000;
+        const scaleUp = 2;
+        let width = img.width * scaleUp;
+        let height = img.height * scaleUp;
+
+        // if (width > height) {
+        //   if (width > MAX_DIMENSION) {
+        //     height *= MAX_DIMENSION / width;
+        //     width = MAX_DIMENSION;
+        //   }
+        // } else {
+        //   if (height > MAX_DIMENSION) {
+        //     width *= MAX_DIMENSION / height;
+        //     height = MAX_DIMENSION;
+        //   }
+        // }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // 2. 필터 적용 (핵심 변경 사항) 🎨
+        // 반드시 drawImage '이전'에 선언해야 적용됩니다!
+        // contrast(1.2)는 글자와 배경을 더 뚜렷하게 구분해줍니다.
+        ctx.filter = "grayscale(1) contrast(1.5) brightness(1.1)";
 
         // 이미지를 캔버스에 그리기
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        // 픽셀 데이터 조작 (회색조 변환)
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
+        // // 이진화 처리 추가
+        // const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        // const data = imageData.data;
+        // const threshold = 140; // 이미지에 따라 조절 (100~180)
+        //
+        // for (let i = 0; i < data.length; i += 4) {
+        //   const v = data[i] > threshold ? 255 : 0;
+        //   data[i] = data[i + 1] = data[i + 2] = v;
+        // }
+        // ctx.putImageData(imageData, 0, 0);
 
-        for (let i = 0; i < data.length; i += 4) {
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
-          // 회색조 공식
-          const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        // 4. 결과 반환
+        resolve(canvas.toDataURL("image/jpeg", 1));
+      };
 
-          data[i] = gray; // R
-          data[i + 1] = gray; // G
-          data[i + 2] = gray; // B
-        }
+      img.onerror = () => {
+        URL.revokeObjectURL(img.src); // 메모리 정리 추가
 
-        ctx.putImageData(imageData, 0, 0);
-        resolve(canvas.toDataURL("image/jpeg", 1.0)); // 품질 100%
+        reject(new Error("이미지 로드 실패"));
       };
     });
   };
 
+  /**
+   * 이미지 업로드
+   * @param e
+   */
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !workerRef.current) return;
+
+    const type = file.type;
+
+    if (!type.startsWith("image/")) {
+      alert("이미지 파일만 추가해주세요");
+      return;
+    }
 
     setIsLoading(true);
     setStatusText("이미지 다듬는 중...");
 
     try {
-      // 1. 전처리 (확대 + 흑백)
+      // 이미지 전처리 (축소 + 흑백)
       const processedImageUrl = await preprocessImage(file);
 
       setStatusText("글자 읽는 중...");
@@ -188,7 +222,6 @@ export default function OcrScanner() {
         <input
           type="file"
           accept="image/*"
-          // capture="environment"
           onChange={handleImageUpload}
           className="hidden"
           disabled={isLoading}
@@ -225,4 +258,6 @@ export default function OcrScanner() {
       </div>
     </div>
   );
-}
+};
+
+export default OcrScanner;
